@@ -44,6 +44,10 @@ class AgentState(TypedDict):
     commit_hash: Optional[str]
     push_success: Optional[bool]
     
+    pull_request_url: Optional[str]
+    pull_request_created: Optional[bool]
+    pull_request_error: Optional[str]
+    
     errors: List[Dict[str, Any]]
     retry_count: int
     
@@ -70,6 +74,7 @@ class BaseAgent:
         workflow.add_node("implement_changes", self._implement_changes_node)
         workflow.add_node("commit_changes", self._commit_changes_node)
         workflow.add_node("push_changes", self._push_changes_node)
+        workflow.add_node("create_pull_request", self._create_pull_request_node)
         workflow.add_node("handle_error", self._handle_error_node)
         
         # Set entry point
@@ -114,6 +119,15 @@ class BaseAgent:
         
         workflow.add_conditional_edges(
             "push_changes",
+            self._should_continue,
+            {
+                "continue": "create_pull_request",
+                "error": "handle_error"
+            }
+        )
+        
+        workflow.add_conditional_edges(
+            "create_pull_request",
             self._should_continue,
             {
                 "continue": END,
@@ -209,6 +223,22 @@ class BaseAgent:
             
         except Exception as e:
             state = await self._handle_node_error("push_changes", state, e)
+            
+        return state
+    
+    async def _create_pull_request_node(self, state: AgentState) -> AgentState:
+        """Create a pull request."""
+        try:
+            self._log_node_start("create_pull_request", state)
+            
+            state["current_step"] = "create_pull_request"
+            state["last_update"] = datetime.utcnow()
+            
+            state["steps_completed"].append("create_pull_request")
+            self._log_node_success("create_pull_request", state)
+            
+        except Exception as e:
+            state = await self._handle_node_error("create_pull_request", state, e)
             
         return state
     
@@ -327,6 +357,9 @@ class BaseAgent:
             branch_name=None,
             commit_hash=None,
             push_success=None,
+            pull_request_url=None,
+            pull_request_created=None,
+            pull_request_error=None,
             errors=[],
             retry_count=0,
             start_time=datetime.utcnow(),
