@@ -30,9 +30,10 @@ logger = logging.getLogger(__name__)
 class CodingAgent(BaseAgent):
     """Concrete implementation of the coding agent."""
     
-    def __init__(self):
+    def __init__(self, streaming_service=None):
         super().__init__()
         
+        self.streaming_service = streaming_service
         self.sandbox_service = SandboxService()
         self.git_service = GitService()
         
@@ -60,6 +61,43 @@ class CodingAgent(BaseAgent):
             )
         else:
             raise ValueError(f"Unsupported AI provider: {settings.ai_provider}")
+    
+    async def _send_streaming_update(self, correlation_id: str, message: str, progress: int = None, step: str = None):
+        """Send a streaming update using the streaming service if available."""
+        if self.streaming_service:
+            try:
+                # Use the appropriate streaming service method
+                if progress is not None:
+                    # Send progress update
+                    await self.streaming_service.send_progress(
+                        correlation_id=correlation_id,
+                        progress=progress,
+                        step=step or message
+                    )
+                else:
+                    # Send AI message
+                    await self.streaming_service.send_ai_message(
+                        correlation_id=correlation_id,
+                        message=message
+                    )
+            except Exception as e:
+                # Fallback to logging if streaming fails
+                self.telemetry.log_error(
+                    e,
+                    context={"streaming_update": message, "correlation_id": correlation_id},
+                    correlation_id=correlation_id
+                )
+        else:
+            # Log the streaming update for now
+            self.telemetry.log_event(
+                f"Streaming update: {message}",
+                correlation_id=correlation_id,
+                progress=progress,
+                step=step
+            )
+        
+        # Always log for debugging
+        logger.info(f"[{correlation_id}] {message} (progress: {progress}%, step: {step})")
     
     def _create_system_prompt(self) -> str:
         """Create the system prompt for the agent."""
@@ -151,11 +189,26 @@ Think through this carefully and provide a comprehensive plan."""),
                 raise ValueError("correlation_id missing in state at analyze_repository_node")
             self._log_node_start("analyze_repository", state)
             
+            # Send initial streaming update
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                "🔍 Analyzing repository structure...", 
+                progress=10, 
+                step="Analyzing Repository"
+            )
+            
             state["current_step"] = "analyze_repository"
             state["last_update"] = datetime.utcnow()
 
             await self.sandbox_service.create_sandbox(
                 correlation_id=state["correlation_id"]
+            )
+            
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                "📥 Cloning repository...", 
+                progress=20, 
+                step="Cloning Repository"
             )
             
             analyze_tool = next(t for t in self.tools if t.name == "analyze_repository")
@@ -171,10 +224,22 @@ Think through this carefully and provide a comprehensive plan."""),
                 SystemMessage(content=f"Repository analyzed: {json.dumps(analysis, indent=2)}")
             )
             
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                "✅ Repository analysis complete", 
+                progress=30, 
+                step="Repository Analysis Complete"
+            )
+            
             state["steps_completed"].append("analyze_repository")
             self._log_node_success("analyze_repository", state)
             
         except Exception as e:
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                f"❌ Repository analysis failed: {str(e)}"
+            )
+            
             self.telemetry.log_error(
                 e,
                 context={"step": "analyze_repository", **state},
@@ -190,8 +255,23 @@ Think through this carefully and provide a comprehensive plan."""),
         try:
             self._log_node_start("create_plan", state)
             
+            # Send initial streaming update
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                "🧠 Creating implementation plan...", 
+                progress=35, 
+                step="Creating Implementation Plan"
+            )
+            
             state["current_step"] = "create_plan"
             state["last_update"] = datetime.utcnow()
+            
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                "📋 Analyzing requirements and planning approach...", 
+                progress=40, 
+                step="Analyzing Requirements"
+            )
             
             prompt = self.planning_prompt.format_messages(
                 repo_url=state["repo_url"],
@@ -207,36 +287,25 @@ Think through this carefully and provide a comprehensive plan."""),
             state["plan"] = plan
             state["messages"].append(response)
             
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                "✅ Implementation plan created", 
+                progress=45, 
+                step="Implementation Plan Complete"
+            )
+            
             state["steps_completed"].append("create_plan")
             self._log_node_success("create_plan", state)
             
         except Exception as e:
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                f"❌ Planning failed: {str(e)}"
+            )
+            
             state = await self._handle_node_error("create_plan", state, e)
             
         return state
-    
-    @traceable(name="plan_changes")
-    async def _plan_changes_node(self, state: AgentState) -> AgentState:
-        try:
-            if not state.get("correlation_id"):
-                raise ValueError("correlation_id missing in state at plan_changes_node")
-            self._log_node_start("plan_changes", state)
-            plan_tool = next(t for t in self.tools if t.name == "plan_changes")
-            plan = await plan_tool.ainvoke({
-                "correlation_id": state["correlation_id"],
-                "repo_path": state["repo_path"],
-                "repo_analysis": state["repo_analysis"],
-                "goal": state["goal"]
-            })
-            state["plan"] = plan
-            return state
-        except Exception as e:
-            self.telemetry.log_error(
-                e,
-                context={"step": "plan_changes", **state},
-                correlation_id=state.get("correlation_id")
-            )
-            raise
     
     @traceable(name="implement_changes")
     async def _implement_changes_node(self, state: AgentState) -> AgentState:
@@ -246,10 +315,25 @@ Think through this carefully and provide a comprehensive plan."""),
                 raise ValueError("correlation_id missing in state at implement_changes_node")
             self._log_node_start("implement_changes", state)
             
+            # Send initial streaming update
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                "⚒️ Implementing changes...", 
+                progress=50, 
+                step="Implementing Changes"
+            )
+            
             state["current_step"] = "implement_changes"
             state["last_update"] = datetime.utcnow()
             
             # Create branch first
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                "🌿 Creating feature branch...", 
+                progress=52, 
+                step="Creating Branch"
+            )
+            
             create_branch_tool = next(t for t in self.tools if t.name == "create_branch")
             
             # Create branch name
@@ -290,6 +374,20 @@ Branch name:"""
             })
             
             state["branch_name"] = branch_name
+            
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                f"✅ Branch created: {branch_name}", 
+                progress=55, 
+                step="Branch Created"
+            )
+            
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                "📝 Writing code changes...", 
+                progress=60, 
+                step="Writing Code"
+            )
             
             # Create a simple prompt for the LLM to use tools directly
             implementation_prompt = f"""You are implementing the changes for: {state['prompt']}
@@ -346,6 +444,15 @@ Start by reading the main application file, then create the component, then inte
             while iteration < max_iterations:
                 iteration += 1
                 print(f"\n===== ITERATION {iteration} =====")
+                
+                # Send progress update for each iteration
+                progress_value = 60 + (iteration * 5)  # 60, 65, 70, etc.
+                await self._send_streaming_update(
+                    state["correlation_id"], 
+                    f"🔄 Implementation iteration {iteration}...", 
+                    progress=min(progress_value, 68), 
+                    step=f"Implementation Step {iteration}"
+                )
                 
                 # Get the LLM response with tool calling
                 response = await self.llm.bind_tools(self.tools).ainvoke(messages)
@@ -488,6 +595,14 @@ Continue with the next necessary step, or respond with 'TASK COMPLETE' if everyt
             print(f"\n===== IMPLEMENTATION LOOP COMPLETED AFTER {iteration} ITERATIONS =====")
             print(f"Changes made: {changes_made}")
             
+            # Send final implementation update
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                f"✅ Implementation complete - {len(changes_made)} files changed", 
+                progress=68, 
+                step="Implementation Complete"
+            )
+            
             # Final validation to ensure integration was completed
             if changes_made:
                 component_files = [
@@ -528,6 +643,11 @@ Continue with the next necessary step, or respond with 'TASK COMPLETE' if everyt
             self._log_node_success("implement_changes", state)
             
         except Exception as e:
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                f"❌ Implementation failed: {str(e)}"
+            )
+            
             self.telemetry.log_error(
                 e,
                 context={"step": "implement_changes", **state},
@@ -539,94 +659,118 @@ Continue with the next necessary step, or respond with 'TASK COMPLETE' if everyt
     
     @traceable(name="commit_changes")
     async def _commit_changes_node(self, state: AgentState) -> AgentState:
+        """Commit the changes to git."""
         try:
-            if not state.get("correlation_id"):
-                raise ValueError("correlation_id missing in state at commit_changes_node")
             self._log_node_start("commit_changes", state)
+            
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                "📦 Committing changes...", 
+                progress=70, 
+                step="Committing changes"
+            )
             
             state["current_step"] = "commit_changes"
             state["last_update"] = datetime.utcnow()
             
-            # Create a better commit message based on the actual changes
-            changes_summary = []
-            if state.get("changes_made"):
-                for change in state["changes_made"]:
-                    action = change.get("action", "modified")
-                    file_path = change.get("file_path", "unknown")
-                    if action == "created":
-                        changes_summary.append(f"Add {file_path}")
-                    elif action == "modified":
-                        changes_summary.append(f"Update {file_path}")
-            
-            if changes_summary:
-                # Use the first change as the main message, limit to 50 chars
-                commit_message = changes_summary[0]
-                if len(changes_summary) > 1:
-                    commit_message += f" and {len(changes_summary) - 1} more files"
-                commit_message = commit_message[:50]
+            # Use the existing branch name from implement_changes_node
+            # If no branch was created yet, create one now
+            if not state.get("branch_name"):
+                branch_name = f"backspace-agent-{state['correlation_id'][:8]}"
+                state["branch_name"] = branch_name
+                
+                # Create the branch first
+                await self._send_streaming_update(
+                    state["correlation_id"], 
+                    f"🌿 Creating branch: {branch_name}...", 
+                    progress=68, 
+                    step="Creating branch"
+                )
+                
+                create_branch_tool = next(t for t in self.tools if t.name == "create_branch")
+                branch_result = await create_branch_tool.ainvoke({
+                    "correlation_id": state["correlation_id"],
+                    "repo_path": state["repo_path"],
+                    "branch_name": branch_name
+                })
+                
+                if not branch_result.get("success", False):
+                    raise Exception(f"Failed to create branch: {branch_result.get('error', 'Unknown error')}")
             else:
-                # Fallback to prompt-based message
-                prompt_summary = state.get("prompt", "")[:30]
-                commit_message = f"feat: {prompt_summary}"
+                # Branch already exists from implement_changes_node
+                branch_name = state["branch_name"]
+                await self._send_streaming_update(
+                    state["correlation_id"], 
+                    f"📝 Using existing branch: {branch_name}...", 
+                    progress=68, 
+                    step="Using existing branch"
+                )
             
-            # Clean up the commit message
-            commit_message = commit_message.replace('"', '').replace("'", "").replace('`', '').strip()
-            
-            # Ensure it's not empty or just punctuation
-            if not commit_message or commit_message in ['```', '`', '"', "'"]:
-                commit_message = "feat: implement requested changes"
+            # Commit the changes
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                f"📝 Committing changes to branch: {branch_name}...", 
+                progress=72, 
+                step="Committing changes"
+            )
             
             commit_tool = next(t for t in self.tools if t.name == "commit_changes")
-            commit_result = await commit_tool.ainvoke({
+            result = await commit_tool.ainvoke({
                 "correlation_id": state["correlation_id"],
                 "repo_path": state["repo_path"],
-                "message": commit_message
+                "message": f"feat: {state['prompt'][:50]}..."
             })
-            state["commit_result"] = commit_result
-            state["commit_hash"] = commit_result.get("commit_hash")
+            
+            state["commit_hash"] = result.get("commit_hash")
+            
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                f"✅ Changes committed to branch: {branch_name}"
+            )
             
             state["steps_completed"].append("commit_changes")
             self._log_node_success("commit_changes", state)
             
         except Exception as e:
-            self.telemetry.log_error(
-                e,
-                context={"step": "commit_changes", **state},
-                correlation_id=state.get("correlation_id")
-            )
-            raise
+            state = await self._handle_node_error("commit_changes", state, e)
             
         return state
     
     @traceable(name="push_changes")
     async def _push_changes_node(self, state: AgentState) -> AgentState:
+        """Push changes to the remote repository."""
         try:
-            if not state.get("correlation_id"):
-                raise ValueError("correlation_id missing in state at push_changes_node")
             self._log_node_start("push_changes", state)
+            
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                "🚀 Pushing changes to remote...", 
+                progress=85, 
+                step="Pushing changes"
+            )
             
             state["current_step"] = "push_changes"
             state["last_update"] = datetime.utcnow()
             
             push_tool = next(t for t in self.tools if t.name == "push_changes")
-            push_result = await push_tool.ainvoke({
+            result = await push_tool.ainvoke({
                 "correlation_id": state["correlation_id"],
                 "repo_path": state["repo_path"],
                 "branch_name": state["branch_name"]
             })
-            state["push_result"] = push_result
-            state["push_success"] = True
+            
+            state["push_success"] = result.get("success", False)
+            
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                f"✅ Changes pushed to remote branch: {state['branch_name']}"
+            )
             
             state["steps_completed"].append("push_changes")
             self._log_node_success("push_changes", state)
             
         except Exception as e:
-            self.telemetry.log_error(
-                e,
-                context={"step": "push_changes", **state},
-                correlation_id=state.get("correlation_id")
-            )
-            raise
+            state = await self._handle_node_error("push_changes", state, e)
             
         return state
     
@@ -636,6 +780,14 @@ Continue with the next necessary step, or respond with 'TASK COMPLETE' if everyt
             if not state.get("correlation_id"):
                 raise ValueError("correlation_id missing in state at create_pull_request_node")
             self._log_node_start("create_pull_request", state)
+            
+            # Send initial progress update
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                "📄 Creating pull request...", 
+                progress=90, 
+                step="Creating Pull Request"
+            )
             
             state["current_step"] = "create_pull_request"
             state["last_update"] = datetime.utcnow()
@@ -745,6 +897,13 @@ This pull request implements the requested changes by completing the following a
             
             # Try to create the PR using GitService
             try:
+                await self._send_streaming_update(
+                    state["correlation_id"], 
+                    f"🔗 Creating pull request: {pr_title}...", 
+                    progress=95, 
+                    step="Creating Pull Request"
+                )
+                
                 from app.services.git_service import GitService
                 git_service = GitService()
                 
@@ -759,6 +918,12 @@ This pull request implements the requested changes by completing the following a
                 state["pull_request_url"] = pr_url
                 state["pull_request_created"] = True
                 
+                # Send success message with PR URL
+                await self._send_streaming_update(
+                    state["correlation_id"], 
+                    f"✅ Pull request created successfully: {pr_url}"
+                )
+                
                 self.telemetry.log_event(
                     "Pull request created successfully",
                     correlation_id=state["correlation_id"],
@@ -768,6 +933,11 @@ This pull request implements the requested changes by completing the following a
                 
             except Exception as pr_error:
                 # Log the error but don't fail the whole workflow
+                await self._send_streaming_update(
+                    state["correlation_id"], 
+                    f"⚠️ PR creation failed: {str(pr_error)}"
+                )
+                
                 self.telemetry.log_error(
                     pr_error,
                     context={"step": "create_pull_request", **state},
@@ -780,6 +950,11 @@ This pull request implements the requested changes by completing the following a
             self._log_node_success("create_pull_request", state)
             
         except Exception as e:
+            await self._send_streaming_update(
+                state["correlation_id"], 
+                f"❌ Error creating pull request: {str(e)}"
+            )
+            
             self.telemetry.log_error(
                 e,
                 context={"step": "create_pull_request", **state},

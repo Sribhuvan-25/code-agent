@@ -116,26 +116,29 @@ class GitService:
                 if exit_code != 0:
                     raise GitError(f"Failed to clone repository: {stderr}")
                 
-                await sandbox_service.execute_command(
-                    correlation_id=correlation_id,
-                    command=f"cd {sandbox_repo_path} && git config user.email 'backspace-agent@example.com'"
-                )
-                
-                await sandbox_service.execute_command(
-                    correlation_id=correlation_id,
-                    command=f"cd {sandbox_repo_path} && git config user.name 'Backspace Agent'"
-                )
+                # Try to set git config, but don't fail if it doesn't work
+                try:
+                    await self._ensure_git_user_config(correlation_id, sandbox_repo_path, sandbox_service)
+                except Exception as config_error:
+                    self.telemetry.log_event(
+                        "Git config setup failed but continuing",
+                        correlation_id=correlation_id,
+                        error=str(config_error),
+                        level="warning"
+                    )
                 
                 if branch:
                     stdout, stderr, exit_code = await sandbox_service.execute_command(
                         correlation_id=correlation_id,
-                        command=f"cd {sandbox_repo_path} && git checkout {branch}"
+                        command=f"git checkout {branch}",
+                        working_dir=sandbox_repo_path
                     )
                     
                     if exit_code != 0:
                         stdout, stderr, exit_code = await sandbox_service.execute_command(
                             correlation_id=correlation_id,
-                            command=f"cd {sandbox_repo_path} && git checkout -b {branch}"
+                            command=f"git checkout -b {branch}",
+                            working_dir=sandbox_repo_path
                         )
                         
                         if exit_code != 0:
@@ -183,16 +186,57 @@ class GitService:
     
     async def _ensure_git_user_config(self, correlation_id: str, repo_path: str, sandbox_service: SandboxService) -> None:
         """Ensure git user.name and user.email are set in the repo."""
-        await sandbox_service.execute_command(
-            correlation_id=correlation_id,
-            command="git config user.email 'backspace-agent@example.com'",
-            working_dir=repo_path
-        )
-        await sandbox_service.execute_command(
-            correlation_id=correlation_id,
-            command="git config user.name 'Backspace Agent'",
-            working_dir=repo_path
-        )
+        try:
+            stdout, stderr, exit_code = await sandbox_service.execute_command(
+                correlation_id=correlation_id,
+                command="git config user.email 'backspace-agent@example.com'",
+                working_dir=repo_path
+            )
+            
+            if exit_code != 0:
+                self.telemetry.log_event(
+                    "Git config user.email failed, trying alternative",
+                    correlation_id=correlation_id,
+                    stderr=stderr,
+                    exit_code=exit_code,
+                    level="warning"
+                )
+                
+                # Try without cd command
+                await sandbox_service.execute_command(
+                    correlation_id=correlation_id,
+                    command=f"cd {repo_path} && git config user.email 'backspace-agent@example.com'",
+                    working_dir="/"
+                )
+            
+            stdout, stderr, exit_code = await sandbox_service.execute_command(
+                correlation_id=correlation_id,
+                command="git config user.name 'Backspace Agent'",
+                working_dir=repo_path
+            )
+            
+            if exit_code != 0:
+                self.telemetry.log_event(
+                    "Git config user.name failed, trying alternative",
+                    correlation_id=correlation_id,
+                    stderr=stderr,
+                    exit_code=exit_code,
+                    level="warning"
+                )
+                
+                # Try without cd command
+                await sandbox_service.execute_command(
+                    correlation_id=correlation_id,
+                    command=f"cd {repo_path} && git config user.name 'Backspace Agent'",
+                    working_dir="/"
+                )
+        except Exception as e:
+            self.telemetry.log_event(
+                "Git config setup failed, continuing without it",
+                correlation_id=correlation_id,
+                error=str(e),
+                level="warning"
+            )
 
     async def create_branch(
         self,
@@ -365,6 +409,14 @@ class GitService:
         ):
             try:
                 token = github_token or settings.github_token
+                if not token:
+                    self.telemetry.log_event(
+                        "No GitHub token available - push may fail",
+                        correlation_id=correlation_id,
+                        level="warning"
+                    )
+                
+                # Set up authentication if token is available
                 if token:
                     await sandbox_service.execute_command(
                         correlation_id=correlation_id,
@@ -378,6 +430,30 @@ class GitService:
                         working_dir=repo_path
                     )
                 
+                # First check if we have anything to push
+                stdout, stderr, exit_code = await sandbox_service.execute_command(
+                    correlation_id=correlation_id,
+                    command="git status --porcelain",
+                    working_dir=repo_path
+                )
+                
+                if exit_code == 0 and not stdout.strip():
+                    # Check if branch exists on remote
+                    stdout, stderr, exit_code = await sandbox_service.execute_command(
+                        correlation_id=correlation_id,
+                        command=f"git ls-remote --heads origin {branch_name}",
+                        working_dir=repo_path
+                    )
+                    
+                    if exit_code == 0 and stdout.strip():
+                        self.telemetry.log_event(
+                            "Branch already exists on remote and no changes to push",
+                            correlation_id=correlation_id,
+                            branch_name=branch_name
+                        )
+                        return
+                
+                # Try to push with detailed error reporting
                 stdout, stderr, exit_code = await sandbox_service.execute_command(
                     correlation_id=correlation_id,
                     command=f"git push -u origin {branch_name}",
@@ -385,7 +461,44 @@ class GitService:
                 )
                 
                 if exit_code != 0:
-                    raise GitError(f"Failed to push changes: {stderr}")
+                    # Get more detailed error information
+                    error_details = []
+                    
+                    if stderr:
+                        error_details.append(f"Push stderr: {stderr}")
+                    if stdout:
+                        error_details.append(f"Push stdout: {stdout}")
+                    
+                    # Check git remote configuration
+                    remote_stdout, remote_stderr, remote_exit = await sandbox_service.execute_command(
+                        correlation_id=correlation_id,
+                        command="git remote -v",
+                        working_dir=repo_path
+                    )
+                    
+                    if remote_exit == 0:
+                        error_details.append(f"Git remotes: {remote_stdout}")
+                    
+                    # Check current branch
+                    branch_stdout, branch_stderr, branch_exit = await sandbox_service.execute_command(
+                        correlation_id=correlation_id,
+                        command="git branch -a",
+                        working_dir=repo_path
+                    )
+                    
+                    if branch_exit == 0:
+                        error_details.append(f"Git branches: {branch_stdout}")
+                    
+                    # Check if it's an authentication issue
+                    if "authentication" in stderr.lower() or "permission" in stderr.lower():
+                        error_details.append("This appears to be an authentication issue. Make sure GitHub token is valid and has push permissions.")
+                    
+                    # Check if it's a remote branch issue
+                    if "rejected" in stderr.lower() or "non-fast-forward" in stderr.lower():
+                        error_details.append("This appears to be a merge conflict or branch protection issue.")
+                    
+                    full_error = " | ".join(error_details) if error_details else f"Unknown push error (exit code: {exit_code})"
+                    raise GitError(f"Failed to push changes: {full_error}")
                 
                 self.telemetry.log_event(
                     "Changes pushed successfully",
@@ -644,29 +757,101 @@ class GitService:
             repo_path=repo_path
         ):
             try:
+                # Use a simple find command without pipes to avoid shell issues
                 stdout, stderr, exit_code = await sandbox_service.execute_command(
                     correlation_id=correlation_id,
-                    command=f"find {repo_path} -type f -not -path '*/.git/*'",
+                    command='find . -type f -not -path "*/.git/*"',
                     working_dir=repo_path
                 )
                 
                 if exit_code != 0:
-                    raise GitError(f"Failed to list files: {stderr}")
+                    # Try alternative approach if find fails
+                    self.telemetry.log_event(
+                        f"Find command failed (exit {exit_code}), trying ls approach",
+                        correlation_id=correlation_id,
+                        stderr=stderr,
+                        level="warning"
+                    )
+                    
+                    # Fallback to ls approach
+                    stdout, stderr, exit_code = await sandbox_service.execute_command(
+                        correlation_id=correlation_id,
+                        command='ls -la',
+                        working_dir=repo_path
+                    )
+                    
+                    if exit_code != 0:
+                        raise GitError(f"Failed to list files with both find and ls. Find stderr: '{stderr}'. Working dir: {repo_path}")
+                    
+                    # If ls works, try a different find approach
+                    stdout, stderr, exit_code = await sandbox_service.execute_command(
+                        correlation_id=correlation_id,
+                        command='find . -name "*"',
+                        working_dir=repo_path
+                    )
+                    
+                    if exit_code != 0:
+                        # If even basic find fails, manually build file list
+                        stdout, stderr, exit_code = await sandbox_service.execute_command(
+                            correlation_id=correlation_id,
+                            command='ls -R',
+                            working_dir=repo_path
+                        )
+                        
+                        if exit_code != 0:
+                            raise GitError(f"All file listing methods failed. Last stderr: '{stderr}'. Working dir: {repo_path}")
                 
-                files = [
-                    line.strip().lstrip("./") 
-                    for line in stdout.split("\n") 
-                    if line.strip() and not line.startswith("./.git/")
-                ]
+                # Process the output to get clean relative paths
+                files = []
+                lines = stdout.split("\n")
                 
+                for line in lines:
+                    if line.strip():
+                        # Remove leading './' from find output
+                        relative_path = line.strip()
+                        if relative_path.startswith("./"):
+                            relative_path = relative_path[2:]
+                        
+                        # Skip git files, directories, and empty paths
+                        if (relative_path and 
+                            not relative_path.startswith(".git/") and
+                            not relative_path.endswith("/") and
+                            not relative_path.startswith(".git") and
+                            relative_path != "." and
+                            relative_path != ".." and
+                            ":" not in relative_path):  # Skip ls -R directory headers
+                            files.append(relative_path)
+                
+                # Remove duplicates and limit
+                files = list(set(files))
                 if len(files) > max_files:
                     files = files[:max_files]
+                
+                # If no files found, try to debug the issue
+                if not files:
+                    # Check if directory exists and has content
+                    debug_stdout, debug_stderr, debug_exit = await sandbox_service.execute_command(
+                        correlation_id=correlation_id,
+                        command='pwd && ls -la',
+                        working_dir=repo_path
+                    )
+                    
+                    self.telemetry.log_event(
+                        "No files found, debugging",
+                        correlation_id=correlation_id,
+                        debug_stdout=debug_stdout,
+                        debug_stderr=debug_stderr,
+                        debug_exit=debug_exit,
+                        working_dir=repo_path,
+                        level="warning"
+                    )
                 
                 self.telemetry.log_event(
                     "Repository files listed",
                     correlation_id=correlation_id,
                     file_count=len(files),
-                    repo_path=repo_path
+                    repo_path=repo_path,
+                    sample_files=files[:5] if files else []
                 )
                 
                 return files

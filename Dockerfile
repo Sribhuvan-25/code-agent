@@ -21,7 +21,7 @@ RUN useradd --create-home --shell /bin/bash -u 1000 -g docker app
 WORKDIR /app
 
 # Install Python dependencies
-COPY requirements-working.txt requirements.txt
+COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
 # Copy application code

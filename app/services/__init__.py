@@ -16,10 +16,10 @@ def get_git_service():
         return None
 
 def get_agent_service():
-    """Get AgentService instance with lazy import."""
+    """Get LangGraph CodingAgent class with lazy import."""
     try:
-        from .agent_service import AgentService
-        return AgentService
+        from app.agents.coding_agent import CodingAgent
+        return CodingAgent
     except ImportError:
         return None
 
