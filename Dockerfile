@@ -1,5 +1,5 @@
 # Multi-stage build for production optimization
-FROM python:3.11-slim as base
+FROM python:3.11-slim AS base
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -13,21 +13,22 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash app
+# Create non-root user and add to docker group
+RUN groupadd -g 999 docker || true
+RUN useradd --create-home --shell /bin/bash -u 1000 -g docker app
 
 # Set work directory
 WORKDIR /app
 
 # Install Python dependencies
-COPY requirements.txt .
+COPY requirements-working.txt requirements.txt
 RUN pip install -r requirements.txt
 
 # Copy application code
 COPY app/ ./app/
 
 # Change ownership to app user
-RUN chown -R app:app /app
+RUN chown -R app:docker /app
 
 # Switch to non-root user
 USER app

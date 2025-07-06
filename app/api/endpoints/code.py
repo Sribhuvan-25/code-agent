@@ -89,7 +89,7 @@ async def create_code_changes(
     Args:
         request: FastAPI request object
         code_request: Request payload
-        background_tasks: Background tasks manager
+        background_tasks: Background tasks manager (unused now)
         client_ip: Client IP address
         
     Returns:
@@ -157,17 +157,20 @@ async def create_code_changes(
             prompt_length=len(sanitized_prompt)
         )
         
-        background_tasks.add_task(
-            run_background_task,
-            correlation_id=correlation_id,
-            repo_url=sanitized_repo_url,
-            prompt=sanitized_prompt,
-            branch_name=sanitized_branch_name,
-            ai_provider=code_request.ai_provider
+        # Start the background task immediately using asyncio.create_task
+        # instead of FastAPI's BackgroundTasks which runs after response completion
+        asyncio.create_task(
+            process_code_request(
+                correlation_id=correlation_id,
+                repo_url=sanitized_repo_url,
+                prompt=sanitized_prompt,
+                branch_name=sanitized_branch_name,
+                ai_provider=code_request.ai_provider
+            )
         )
         
         telemetry.log_event(
-            "Background task added successfully",
+            "Background task started successfully",
             correlation_id=correlation_id
         )
         
@@ -179,88 +182,6 @@ async def create_code_changes(
             status_code=500,
             detail="Failed to create streaming response"
         )
-
-
-def run_background_task(
-    correlation_id: str,
-    repo_url: str,
-    prompt: str,
-    branch_name: str,
-    ai_provider: Optional[str]
-):
-    """
-    Synchronous wrapper function for background task execution.
-    This is required because FastAPI background_tasks.add_task() only works with sync functions.
-    """
-    try:
-        print(f"DEBUG: run_background_task called with correlation_id={correlation_id}")
-        
-        with open(f"/tmp/debug_bg_{correlation_id[:8]}.txt", "w") as f:
-            f.write(f"run_background_task called at {time.time()}\n")
-            f.write(f"correlation_id: {correlation_id}\n")
-            f.write(f"repo_url: {repo_url}\n")
-            f.write(f"prompt: {prompt}\n")
-        
-        telemetry.log_event(
-            "run_background_task called",
-            correlation_id=correlation_id,
-            repo_url=repo_url,
-            prompt_length=len(prompt)
-        )
-        
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        print(f"DEBUG: Event loop created for correlation_id={correlation_id}")
-        telemetry.log_event(
-            "Event loop created",
-            correlation_id=correlation_id
-        )
-        
-        loop.run_until_complete(
-            process_code_request(
-                correlation_id=correlation_id,
-                repo_url=repo_url,
-                prompt=prompt,
-                branch_name=branch_name,
-                ai_provider=ai_provider
-            )
-        )
-        
-        print(f"DEBUG: Async function completed for correlation_id={correlation_id}")
-        telemetry.log_event(
-            "Async function completed",
-            correlation_id=correlation_id
-        )
-        
-    except Exception as e:
-        print(f"ERROR: run_background_task failed with error: {e}")
-        
-        with open(f"/tmp/debug_bg_{correlation_id[:8]}_error.txt", "w") as f:
-            f.write(f"run_background_task failed at {time.time()}\n")
-            f.write(f"error: {str(e)}\n")
-            f.write(f"error_type: {type(e).__name__}\n")
-        
-        telemetry.log_error(e, correlation_id=correlation_id)
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(
-                streaming_service.send_error(
-                    correlation_id=correlation_id,
-                    error=f"Background task failed: {str(e)}",
-                    error_type="BackgroundTaskError"
-                )
-            )
-        except Exception as stream_error:
-            print(f"ERROR: Failed to send error via streaming: {stream_error}")
-            telemetry.log_error(stream_error, correlation_id=correlation_id)
-    finally:
-        try:
-            loop.close()
-            print(f"DEBUG: Event loop closed for correlation_id={correlation_id}")
-        except:
-            pass
 
 
 async def process_code_request(

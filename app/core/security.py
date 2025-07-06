@@ -36,7 +36,6 @@ def validate_github_url(url: str) -> str:
     if not url or not isinstance(url, str):
         raise InputValidationError("Repository URL is required")
     
-    # Parse the URL
     try:
         parsed = urlparse(url.strip())
     except Exception as e:

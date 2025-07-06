@@ -464,19 +464,25 @@ You are an expert software engineer tasked with implementing code changes.
         context += """
 
 **Instructions:**
-1. Analyze the request and repository structure
+1. Analyze the request and repository structure carefully
 2. Create a detailed implementation plan
-3. Identify specific files to modify
-4. Provide step-by-step instructions
+3. IMPORTANT: If creating new components/files, also plan how to integrate them into the existing application
+4. Identify ALL files that need to be modified (both new files AND existing files for integration)
 5. Consider best practices and code quality
+6. If the request mentions changing something that doesn't exist, plan to either create it or report that it's not found
 
 **Response Format:**
 Please respond with a JSON object containing:
-- summary: Brief description of the changes
-- steps: Array of implementation steps
-- files_to_modify: Array of files that need to be changed
+- summary: Brief description of the changes (include integration if creating new components)
+- steps: Array of implementation steps (include integration steps)
+- files_to_modify: Array of EXISTING files that need to be changed
 - new_files: Array of new files to create (if any)
 - considerations: Important considerations or warnings
+
+**Examples:**
+- If request is "Add a button component", plan should include creating the component AND integrating it into the main app
+- If request is "Change an icon color", first check if the icon exists, then plan accordingly
+- Always consider the full workflow from creation to integration
 """
         
         return context
@@ -492,7 +498,7 @@ Please respond with a JSON object containing:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an expert software engineer. Provide detailed, actionable implementation plans in JSON format."
+                        "content": "You are an expert software engineer. Your task is to create detailed, actionable implementation plans in JSON format. Analyze the repository structure and user request carefully to provide comprehensive plans that include all necessary file modifications and integrations."
                     },
                     {
                         "role": "user",
@@ -503,7 +509,7 @@ Please respond with a JSON object containing:
                 temperature=0.3
             )
             
-            return response.choices[0].message.content
+            return response.choices[0].message.content.strip()
             
         except Exception as e:
             raise AgentError(f"OpenAI API error: {e}")
@@ -679,33 +685,17 @@ Please respond with a JSON object containing:
                         )
                 
                 if not changes_made:
-                    example_file = "README_BACKSPACE.md"
-                    example_content = f"""# Backspace Agent Changes
-
-This file was created by the Backspace coding agent.
-
-## Implementation Plan Summary
-{implementation_plan.get('summary', 'No summary available')}
-
-## Steps Taken
-"""
-                    for i, step in enumerate(implementation_plan.get('steps', []), 1):
-                        example_content += f"{i}. {step}\n"
-                    
-                    await git_service.write_file_content(
+                    # Log that no changes were made
+                    self.telemetry.log_event(
+                        "No changes implemented - no suitable files identified",
                         correlation_id=correlation_id,
-                        repo_path=repo_path,
-                        file_path=example_file,
-                        content=example_content,
-                        sandbox_service=sandbox_service
+                        files_to_modify=files_to_modify,
+                        new_files=new_files,
+                        implementation_plan_summary=implementation_plan.get('summary', 'No summary')
                     )
                     
-                    changes_made.append({
-                        "filepath": example_file,
-                        "action": "created",
-                        "new_content": example_content,
-                        "description": "Created documentation of changes"
-                    })
+                    # Return empty changes list
+                    return []
                 
                 self.telemetry.log_event(
                     "Changes implemented",
@@ -794,7 +784,7 @@ IMPORTANT:
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are an expert software engineer. Generate clean, well-structured code that implements the requested changes. Do NOT include filenames or markdown formatting in your response - only pure code."
+                            "content": "You are an expert software engineer. Your task is to generate clean, production-ready code. CRITICAL RULES:\n1. Output ONLY raw code - no markdown, no explanations, no comments about the task\n2. Never use ```language code blocks\n3. Never include file names or paths in your output\n4. Generate syntactically correct, runnable code\n5. If creating a React component, include proper imports and exports\n6. Follow the existing code style and conventions"
                         },
                         {
                             "role": "user",
@@ -804,27 +794,69 @@ IMPORTANT:
                     max_tokens=2000,
                     temperature=0.3
                 )
-                return response.choices[0].message.content.strip()
+                
+                # Clean up any markdown formatting that might still be present
+                generated_content = response.choices[0].message.content.strip()
+                
+                # Remove markdown code blocks if they exist
+                if generated_content.startswith('```'):
+                    lines = generated_content.split('\n')
+                    # Remove first line if it's a markdown code block start
+                    if lines[0].startswith('```'):
+                        lines = lines[1:]
+                    # Remove last line if it's a markdown code block end
+                    if lines and lines[-1].strip() == '```':
+                        lines = lines[:-1]
+                    generated_content = '\n'.join(lines)
+                
+                return generated_content
             else:
-                if filepath.endswith('.py'):
+                # Generate appropriate fallback content based on file extension
+                file_ext = self._get_file_extension(filepath)
+                
+                if file_ext == 'py':
                     return f"""# Generated by Backspace Agent
 
-def hello_world():
-    \"\"\"Simple hello world function.\"\"\"
-    print("Hello, World!")
+def main():
+    \"\"\"Main function.\"\"\"
+    pass
 
 if __name__ == "__main__":
-    hello_world()
+    main()
 """
-                elif filepath.endswith('.js'):
+                elif file_ext in ['js', 'jsx']:
                     return f"""// Generated by Backspace Agent
 
-function helloWorld() {{
-    console.log("Hello, World!");
+function main() {{
+    // Implementation here
 }}
 
-// Call the function
-helloWorld();
+export default main;
+"""
+                elif file_ext in ['ts', 'tsx']:
+                    return f"""// Generated by Backspace Agent
+
+function main(): void {{
+    // Implementation here
+}}
+
+export default main;
+"""
+                elif file_ext == 'css':
+                    return f"""/* Generated by Backspace Agent */
+
+/* Add your styles here */
+"""
+                elif file_ext == 'html':
+                    return f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Generated by Backspace Agent</title>
+</head>
+<body>
+    <!-- Content here -->
+</body>
+</html>
 """
                 else:
                     return f"# Generated by Backspace Agent\n\n{implementation_plan.get('summary', 'Implementation completed')}"
@@ -842,6 +874,112 @@ helloWorld();
         if '.' in filepath:
             return filepath.split('.')[-1]
         return 'text'
+    
+    async def _identify_files_from_prompt(
+        self,
+        correlation_id: str,
+        prompt: str,
+        repo_analysis: Dict[str, Any],
+        repo_path: str,
+        sandbox_service: SandboxService
+    ) -> List[str]:
+        """
+        Use LLM to intelligently identify files to modify based on the prompt content.
+        
+        Args:
+            correlation_id: Request identifier
+            prompt: The implementation prompt/summary
+            repo_analysis: Repository analysis data
+            repo_path: Path to the repository
+            sandbox_service: Sandbox service instance
+            
+        Returns:
+            List of files to modify
+        """
+        try:
+            # Let the LLM analyze the prompt and repository to identify relevant files
+            if not self.openai_client:
+                # Fallback to basic analysis if no LLM available
+                return repo_analysis.get("key_files", [])[:3]
+            
+            context = f"""
+You are an expert software engineer analyzing a codebase to identify which files need to be modified.
+
+**Task:** {prompt}
+
+**Repository Information:**
+- Total files: {len(repo_analysis.get('files', []))}
+- Languages: {repo_analysis.get('languages', {})}
+- Key files: {repo_analysis.get('key_files', [])}
+
+**All Files in Repository:**
+{repo_analysis.get('files', [])}
+
+**Sample Content from Key Files:**
+"""
+            
+            for file, content in repo_analysis.get('sample_content', {}).items():
+                context += f"\n--- {file} ---\n{content[:500]}...\n"
+            
+            context += """
+
+**Instructions:**
+Analyze the task and repository to identify which files should be modified. Consider:
+1. What the user is asking for
+2. Where that functionality might exist in the codebase
+3. What files would need to be changed to implement the request
+
+Return ONLY a JSON array of file paths that should be modified, like:
+["main.py", "config.py"]
+
+If the request is about something that doesn't exist (like changing a component that doesn't exist), return an empty array: []
+"""
+            
+            response = await self.openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert software engineer. Analyze the codebase and return ONLY a JSON array of file paths. No explanations, no markdown, just the JSON array."
+                    },
+                    {
+                        "role": "user",
+                        "content": context
+                    }
+                ],
+                max_tokens=500,
+                temperature=0.3
+            )
+            
+            try:
+                import json
+                files = json.loads(response.choices[0].message.content.strip())
+                if isinstance(files, list):
+                    self.telemetry.log_event(
+                        "LLM identified files for modification",
+                        correlation_id=correlation_id,
+                        files=files,
+                        prompt=prompt[:50]
+                    )
+                    return files
+            except json.JSONDecodeError:
+                self.telemetry.log_event(
+                    "LLM response could not be parsed as JSON",
+                    correlation_id=correlation_id,
+                    response=response.choices[0].message.content,
+                    level="warning"
+                )
+            
+            # Fallback to basic analysis
+            return repo_analysis.get("key_files", [])[:3]
+            
+        except Exception as e:
+            self.telemetry.log_error(
+                e,
+                context={"correlation_id": correlation_id, "prompt": prompt[:50]},
+                correlation_id=correlation_id
+            )
+            return repo_analysis.get("key_files", [])[:3]
     
     async def health_check(self) -> bool:
         """

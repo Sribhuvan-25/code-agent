@@ -298,34 +298,38 @@ Repository: {state['repo_url']}
 Repository Path: {state['repo_path']}
 Plan: {json.dumps(state['plan'], indent=2)}
 
-TASK: Create the files and make the changes as described in the plan.
+🎯 TASK: Create the files and make the changes as described in the plan.
 
-CRITICAL INSTRUCTIONS:
+⚠️ CRITICAL INSTRUCTIONS - FOLLOW THESE EXACTLY:
 1. ALWAYS read existing files before modifying them using read_file
 2. Create new files using write_file
 3. When modifying existing files, preserve ALL existing content and only add new features
 4. Follow the existing patterns in the codebase (.jsx extensions, Tailwind CSS, etc.)
-5. **COMPLETE THE FULL INTEGRATION** - Don't just create components, integrate them into the app
+5. **MANDATORY: COMPLETE THE FULL INTEGRATION** - Don't just create components, integrate them into the app
 
-IMPORTANT: When adding components (like header, footer, navbar, etc.), you MUST:
-1. Create the new component file
-2. Read the main App.jsx file to understand its structure
-3. Modify App.jsx to import and use the new component
-4. Ensure the component appears in the correct location (header at top, footer at bottom, etc.)
+🔥 INTEGRATION REQUIREMENTS (NON-NEGOTIABLE):
+When adding ANY new component (button, header, footer, navbar, etc.), you MUST complete BOTH steps:
 
-For this specific task:
-- If creating a header: Add it at the top of the App component
-- If creating a footer: Add it at the bottom of the App component  
-- If creating other components: Add them in the appropriate location
-- Always import the component at the top of App.jsx
+✅ STEP 1: Create the component file
+✅ STEP 2: Integrate it into the main application
 
-You must use the tools to complete BOTH steps:
-1. CREATE the component
-2. INTEGRATE it into App.jsx
+Integration means:
+1. Read the main application file (App.jsx, App.js, main.py, index.js, etc.)
+2. Modify the main application file to:
+   - Import the new component at the top
+   - Add the component to the JSX/template/code
+   - Position it correctly (header at top, footer at bottom, etc.)
 
-Do not stop after just creating the component file. Complete the full integration.
+⛔ FAILURE TO INTEGRATE = INCOMPLETE TASK
+Creating a component without integrating it into the app is USELESS and INCOMPLETE.
 
-Start by reading App.jsx, then create the component, then modify App.jsx to include it."""
+🚀 WORKFLOW:
+1. First: Read the main application file to understand its structure
+2. Second: Create the new component file
+3. Third: Modify the main application file to integrate the component
+4. Verify: The component is imported and used in the main app
+
+Start by reading the main application file, then create the component, then integrate it."""
 
             # Use the LLM with tool calling in a conversation loop
             messages = [
@@ -411,8 +415,65 @@ Start by reading App.jsx, then create the component, then modify App.jsx to incl
                             tool_call_id=tool_result["tool_call_id"]
                         ))
                     
-                    # Ask the LLM if it wants to continue
-                    continue_prompt = "Based on the tool results above, do you need to make any more changes to complete the task? If yes, continue using the tools. If the task is complete, respond with 'TASK COMPLETE' and summarize what was accomplished."
+                    # More specific continue prompt that enforces integration
+                    component_creation_done = any(
+                        'write_file' in str(tool_call.get('name', '')) and 
+                        any(ext in str(tool_call.get('args', {}).get('file_path', '')) 
+                            for ext in ['.jsx', '.js', '.tsx', '.ts', '.vue', '.py'])
+                        for tool_call in response.tool_calls
+                    )
+                    
+                    main_file_modification_done = any(
+                        'write_file' in str(tool_call.get('name', '')) and 
+                        any(main_file in str(tool_call.get('args', {}).get('file_path', '')) 
+                            for main_file in ['App.', 'app.', 'main.', 'index.', 'Main.'])
+                        for tool_call in response.tool_calls
+                    )
+                    
+                    # Check if this was a component creation without integration
+                    if component_creation_done and not main_file_modification_done:
+                        continue_prompt = f"""CRITICAL: You created a new component but haven't integrated it into the main application yet!
+
+You must complete BOTH steps:
+✅ Step 1: Create the component (DONE)
+❌ Step 2: Integrate it into the main application (NOT DONE)
+
+To complete the integration:
+1. Use read_file to examine the main application file (App.jsx, App.js, main.py, etc.)
+2. Use write_file to modify the main application file to:
+   - Import the new component
+   - Add the component to the JSX/template/code
+   - Ensure it appears in the correct location
+
+The task is NOT complete until the component is integrated and visible in the main application.
+
+Please continue with the integration step now."""
+                    
+                    elif component_creation_done and main_file_modification_done:
+                        continue_prompt = """Great! You've created the component and integrated it into the main application. 
+
+Please verify your work:
+1. Did you import the component in the main file?
+2. Did you add the component to the JSX/template in the correct location?
+3. Is the component properly positioned (header at top, footer at bottom, etc.)?
+
+If everything looks correct, respond with 'TASK COMPLETE' and summarize what was accomplished.
+If you need to make any adjustments, continue using the tools."""
+                    
+                    else:
+                        continue_prompt = """Based on the tool results above, analyze what you've accomplished so far:
+
+1. Have you created any new components or files?
+2. Have you integrated them into the main application?
+3. Are there any remaining steps from the original plan?
+
+Remember: If you're adding components (buttons, headers, footers, etc.), you MUST:
+- Create the component file
+- Integrate it into the main application file
+- Ensure it's imported and used correctly
+
+Continue with the next necessary step, or respond with 'TASK COMPLETE' if everything is done."""
+                    
                     messages.append(HumanMessage(content=continue_prompt))
                     
                 else:
@@ -426,6 +487,38 @@ Start by reading App.jsx, then create the component, then modify App.jsx to incl
             
             print(f"\n===== IMPLEMENTATION LOOP COMPLETED AFTER {iteration} ITERATIONS =====")
             print(f"Changes made: {changes_made}")
+            
+            # Final validation to ensure integration was completed
+            if changes_made:
+                component_files = [
+                    change for change in changes_made 
+                    if any(ext in change.get("file_path", "") for ext in ['.jsx', '.js', '.tsx', '.ts', '.vue', '.py'])
+                    and not any(main_file in change.get("file_path", "") for main_file in ['App.', 'app.', 'main.', 'index.', 'Main.'])
+                ]
+                
+                main_app_files = [
+                    change for change in changes_made 
+                    if any(main_file in change.get("file_path", "") for main_file in ['App.', 'app.', 'main.', 'index.', 'Main.'])
+                ]
+                
+                if component_files and not main_app_files:
+                    # Component was created but main app wasn't modified - this is incomplete
+                    print("⚠️ WARNING: Component created but main application not modified - integration may be incomplete!")
+                    self.telemetry.log_event(
+                        "Potential incomplete integration detected",
+                        correlation_id=state["correlation_id"],
+                        component_files=[c.get("file_path") for c in component_files],
+                        main_app_files=[c.get("file_path") for c in main_app_files],
+                        level="warning"
+                    )
+                elif component_files and main_app_files:
+                    print("✅ Integration appears complete - component created and main app modified")
+                    self.telemetry.log_event(
+                        "Integration completed successfully",
+                        correlation_id=state["correlation_id"],
+                        component_files=[c.get("file_path") for c in component_files],
+                        main_app_files=[c.get("file_path") for c in main_app_files]
+                    )
             
             state["implementation_result"] = {"output": f"Completed after {iteration} iterations", "tool_calls": []}
             state["changes_made"] = changes_made
@@ -549,32 +642,106 @@ Start by reading App.jsx, then create the component, then modify App.jsx to incl
             
             # Create PR title and description
             changes_summary = []
+            files_created = []
+            files_modified = []
+            
             if state.get("changes_made"):
                 for change in state["changes_made"]:
                     action = change.get("action", "modified")
                     file_path = change.get("file_path", "unknown")
-                    if action == "created":
+                    description = change.get("description", "")
+                    
+                    if "created" in action.lower():
+                        files_created.append(f"- **{file_path}** - {description}")
                         changes_summary.append(f"- Add {file_path}")
-                    elif action == "modified":
+                    elif "modified" in action.lower():
+                        files_modified.append(f"- **{file_path}** - {description}")
                         changes_summary.append(f"- Update {file_path}")
+                    else:
+                        changes_summary.append(f"- {action.title()} {file_path}")
             
             # Create PR title from prompt
             prompt = state.get("prompt", "Implement changes")
             pr_title = prompt[:50]  # GitHub PR title limit
             
-            # Create PR description
-            pr_body = f"""## Summary
+            # Get plan details
+            plan = state.get('plan', {})
+            plan_summary = plan.get('summary', 'No plan summary available')
+            plan_steps = plan.get('steps', [])
+            
+            # Create detailed PR description
+            pr_body = f"""## 🎯 Task
 {prompt}
 
-## Changes Made
-{chr(10).join(changes_summary) if changes_summary else "- Various improvements"}
+## 🚀 What Was Done
+This pull request implements the requested changes by completing the following actions:
 
-## Implementation Plan
-{state.get('plan', {}).get('summary', 'No plan summary available')}
-
----
-*This pull request was automatically created by Backspace AI Coding Agent*
 """
+            
+            # Add implementation details
+            if plan_steps and isinstance(plan_steps, list):
+                # Filter out agent workflow steps and focus on code changes
+                code_related_steps = []
+                for step in plan_steps[:10]:  # Look at more steps to filter
+                    if isinstance(step, dict):
+                        step_text = step.get('description', str(step))
+                    else:
+                        step_text = str(step)
+                    
+                    # Filter out agent workflow steps
+                    workflow_keywords = [
+                        'analyze', 'analysed', 'analyzed', 'repository', 'structure',
+                        'understand', 'read', 'examine', 'review', 'study',
+                        'plan', 'planning', 'create plan', 'implementation plan',
+                        'workflow', 'process', 'approach', 'strategy'
+                    ]
+                    
+                    # Keep steps that are about actual code implementation
+                    step_lower = step_text.lower()
+                    is_workflow_step = any(keyword in step_lower for keyword in workflow_keywords)
+                    is_code_step = any(keyword in step_lower for keyword in [
+                        'create', 'add', 'implement', 'build', 'write', 'modify', 
+                        'update', 'integrate', 'import', 'component', 'function',
+                        'class', 'file', 'code', 'style', 'css', 'jsx', 'js',
+                        'html', 'python', 'install', 'configure', 'setup'
+                    ])
+                    
+                    if is_code_step and not is_workflow_step:
+                        code_related_steps.append(step_text)
+                
+                if code_related_steps:
+                    pr_body += "### Implementation Steps:\n"
+                    for i, step in enumerate(code_related_steps[:5], 1):  # Limit to 5 steps
+                        pr_body += f"{i}. {step}\n"
+                    pr_body += "\n"
+            
+            # Add file changes section
+            pr_body += "## 📁 Files Changed\n\n"
+            
+            if files_created:
+                pr_body += "### ✅ Files Created:\n"
+                pr_body += "\n".join(files_created) + "\n\n"
+            
+            if files_modified:
+                pr_body += "### 📝 Files Modified:\n"
+                pr_body += "\n".join(files_modified) + "\n\n"
+            
+            if not files_created and not files_modified:
+                pr_body += "- No specific file changes detected\n\n"
+            
+            # Add summary of changes
+            total_changes = len(files_created) + len(files_modified)
+            if total_changes > 0:
+                pr_body += f"### 📊 Summary:\n"
+                pr_body += f"- **{len(files_created)}** file(s) created\n"
+                pr_body += f"- **{len(files_modified)}** file(s) modified\n"
+                pr_body += f"- **{total_changes}** total changes\n\n"
+            
+            # Add implementation plan context
+            if plan_summary and plan_summary != "No plan summary available":
+                pr_body += f"## 🗺️ Implementation Plan\n{plan_summary}\n\n"
+            
+            pr_body += "---\n*This pull request was automatically created by **Backspace AI Coding Agent***"
             
             # Try to create the PR using GitService
             try:
@@ -846,8 +1013,8 @@ Start by reading App.jsx, then create the component, then modify App.jsx to incl
             # Also try to find modification patterns
             modify_patterns = [
                 r'### Step 2: Modify.*?App.*?Component.*?```jsx\s*\n(.*?)```',
-                r'modify.*?App\.jsx.*?```jsx\s*\n(.*?)```',
-                r'update.*?App\.jsx.*?```jsx\s*\n(.*?)```'
+                r'modify.*?main.*?file.*?```jsx\s*\n(.*?)```',
+                r'update.*?app.*?component.*?```jsx\s*\n(.*?)```'
             ]
             
             for pattern in modify_patterns:
@@ -855,11 +1022,25 @@ Start by reading App.jsx, then create the component, then modify App.jsx to incl
                 for match in modify_matches:
                     file_content = match.group(1).strip()
                     
+                    # Look for main app files in the existing files
+                    app_files = [f for f in existing_files_content.keys() if 'app' in f.lower() and f.endswith(('.js', '.jsx', '.ts', '.tsx'))]
+                    if app_files:
+                        file_path = app_files[0]
+                    else:
+                        # Try common patterns
+                        common_app_files = ["src/App.jsx", "src/App.js", "src/App.tsx", "src/App.ts", "App.jsx", "App.js"]
+                        for common_file in common_app_files:
+                            if common_file in existing_files_content:
+                                file_path = common_file
+                                break
+                        else:
+                            file_path = "src/App.jsx"  # Default fallback
+                    
                     file_changes.append({
                         "action": "modify",
-                        "file_path": "src/App.jsx",
+                        "file_path": file_path,
                         "content": file_content,
-                        "description": "Modify App.jsx to include Footer component",
+                        "description": f"Modify {file_path} to integrate component",
                         "needs_smart_integration": True
                     })
             
@@ -883,36 +1064,90 @@ Start by reading App.jsx, then create the component, then modify App.jsx to incl
                     
                     # Look for footer component creation
                     if 'footer' in preceding_text.lower() and 'component' in preceding_text.lower():
+                        # Determine appropriate file path based on existing files
+                        if any('components/' in f for f in existing_files_content.keys()):
+                            file_path = "src/components/Footer.jsx"
+                        elif any('src/' in f for f in existing_files_content.keys()):
+                            file_path = "src/Footer.jsx"
+                        else:
+                            file_path = "Footer.jsx"
+                            
                         file_changes.append({
                             "action": "create",
-                            "file_path": "src/components/Footer.jsx",
+                            "file_path": file_path,
                             "content": file_content,
-                            "description": "Create Footer component",
+                            "description": f"Create Footer component at {file_path}",
                             "needs_smart_integration": False
                         })
-                    # Look for App.jsx modification
-                    elif 'app' in preceding_text.lower() and ('modify' in preceding_text.lower() or 'import' in file_content.lower()):
+                    # Look for main app file modification
+                    elif ('app' in preceding_text.lower() or 'main' in preceding_text.lower()) and ('modify' in preceding_text.lower() or 'import' in file_content.lower()):
+                        # Try to infer the actual file path from context
+                        file_path_match = re.search(r'(src/[A-Za-z0-9_/]+\.jsx?)', preceding_text)
+                        if file_path_match:
+                            file_path = file_path_match.group(1)
+                        else:
+                            # Look for main app files in the existing files
+                            app_files = [f for f in existing_files_content.keys() if 'app' in f.lower() and f.endswith(('.js', '.jsx', '.ts', '.tsx'))]
+                            if app_files:
+                                file_path = app_files[0]
+                            else:
+                                # Try common patterns
+                                common_app_files = ["src/App.jsx", "src/App.js", "src/App.tsx", "src/App.ts", "App.jsx", "App.js"]
+                                for common_file in common_app_files:
+                                    if common_file in existing_files_content:
+                                        file_path = common_file
+                                        break
+                                else:
+                                    file_path = "src/App.jsx"  # Default fallback
+                        
                         file_changes.append({
                             "action": "modify",
-                            "file_path": "src/App.jsx",
+                            "file_path": file_path,
                             "content": file_content,
-                            "description": "Modify App.jsx to include Footer component",
+                            "description": f"Modify {file_path} to integrate component",
                             "needs_smart_integration": True
                         })
-                
-                if file_changes:
-                    return {
-                        "file_changes": file_changes,
-                        "description": f"Implementation with {len(file_changes)} inferred file changes",
-                        "success": True
-                    }
-                else:
-                    return {
-                        "file_changes": [],
-                        "description": "No file changes detected in any format",
-                        "success": False,
-                        "error": "Could not parse any file changes from LLM response"
-                    }
+                    # Generic file creation/modification
+                    else:
+                        # Try to infer file type and path from content
+                        file_path = f"generated_file_{i}.jsx"  # Default
+                        
+                        # If it looks like a component (has JSX), give it a component name
+                        if 'export' in file_content and ('jsx' in file_content.lower() or '<' in file_content):
+                            if any('components/' in f for f in existing_files_content.keys()):
+                                file_path = f"src/components/GeneratedComponent_{i}.jsx"
+                            elif any('src/' in f for f in existing_files_content.keys()):
+                                file_path = f"src/GeneratedComponent_{i}.jsx"
+                            else:
+                                file_path = f"GeneratedComponent_{i}.jsx"
+                        # If it looks like a Python file
+                        elif 'def ' in file_content or 'import ' in file_content:
+                            file_path = f"generated_module_{i}.py"
+                        # If it looks like CSS
+                        elif '{' in file_content and '}' in file_content and ('color' in file_content.lower() or 'font' in file_content.lower()):
+                            file_path = f"generated_styles_{i}.css"
+                        
+                        file_changes.append({
+                            "action": "create",
+                            "file_path": file_path,
+                            "content": file_content,
+                            "description": f"Create {file_path}",
+                            "needs_smart_integration": False
+                        })
+            
+            if file_changes:
+                return {
+                    "file_changes": file_changes,
+                    "description": f"Implementation with {len(file_changes)} inferred file changes",
+                    "success": True
+                }
+            else:
+                return {
+                    "file_changes": [],
+                    "description": "No file changes detected in any format",
+                    "success": False,
+                    "error": "Could not parse any file changes from LLM response"
+                }
                 
         except Exception as e:
             logger.warning(f"Failed to parse incremental implementation: {e}")
