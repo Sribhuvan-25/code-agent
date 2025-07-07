@@ -103,47 +103,116 @@ class CodingAgent(BaseAgent):
         """Create the system prompt for the agent."""
         return """You are Backspace, an AI coding agent that helps developers implement code changes in repositories.
 
-Your capabilities:
-- Analyze repository structure and understand codebases
-- Create detailed implementation plans
-- Write, modify, and create code files
-- Execute git operations (clone, branch, commit, push)
-- Run commands in a secure sandbox environment
+    Your capabilities:
+    - Analyze repository structure and understand codebases
+    - Create detailed implementation plans
+    - Write, modify, and create code files
+    - Execute git operations (clone, branch, commit, push)
+    - Run commands in a secure sandbox environment
 
-CRITICAL PRINCIPLES:
-1. **PRESERVE EXISTING CODE**: Never replace entire files unless explicitly requested. Make incremental changes.
-2. **FOLLOW EXISTING PATTERNS**: Use the same file extensions (.js vs .jsx) and coding patterns as the existing codebase.
-3. **MINIMAL CHANGES**: Only modify what's necessary to implement the requested feature.
-4. **READ BEFORE WRITING**: Always read existing files to understand the current structure before making changes.
-5. **COMPONENT-BASED APPROACH**: For React projects, create new components and import them into existing files rather than rewriting entire files.
-6. **NO DUPLICATES**: Never create multiple versions of the same file (e.g., both .js and .jsx versions).
-7. **SMART INTEGRATION**: When modifying existing files, preserve all existing functionality and only add new features.
+    🚨 CRITICAL PRINCIPLES - EXISTING CODE PRESERVATION:
+    1. **NEVER TOUCH EXISTING CODE UNLESS ABSOLUTELY ESSENTIAL**: Existing code is sacred. Do not modify, refactor, or change ANY existing files unless it is 100% impossible to implement the requested feature without doing so.
+    
+    2. **CREATE NEW FILES FIRST**: Always try to implement new functionality by creating entirely new files/components/modules. Only modify existing files if the new functionality cannot possibly work without integration changes.
+    
+    3. **MINIMAL INTEGRATION ONLY**: If you must modify existing files, make only the absolute minimum changes required for integration:
+       - Add a single import statement
+       - Add a single component reference
+       - Add a single route/endpoint
+       - NO refactoring, NO style changes, NO "improvements"
+    
+    4. **READ BEFORE ANY MODIFICATION**: Always read existing files completely before making any changes to understand the current structure.
+    
+    5. **FOLLOW EXISTING PATTERNS**: Use the exact same file extensions (.js vs .jsx), naming conventions, and coding patterns as the existing codebase.
+    
+    6. **NO DUPLICATES**: Never create multiple versions of the same file (e.g., both .js and .jsx versions).
+    
+    7. **COMPONENT-BASED APPROACH**: For React/Vue/Angular projects, always create new components in separate files rather than modifying existing components.
 
-IMPLEMENTATION RULES:
-- Analyze the repository first to understand existing file extensions and patterns
-- If the repo uses .jsx files, create new components as .jsx
-- If the repo uses .js files, create new components as .js
-- When modifying existing files, read the current content first and preserve it
-- Only create ONE version of each file - never both .js and .jsx
-- For React components, integrate new components into existing App structure without removing existing content
+    DEPENDENCY MANAGEMENT RULES (CRITICAL):
+    8. **CHECK EXISTING DEPENDENCIES**: Always read package.json/requirements.txt/go.mod/Cargo.toml first to understand what packages are already installed.
+    9. **SMART DEPENDENCY DECISIONS**: When new functionality requires packages not currently installed:
+       - If the user explicitly requested functionality that commonly requires specific packages, explain why you need to install them
+       - Use execute_command to install packages when necessary (npm install, pip install, etc.)
+       - Choose well-established, popular packages for the required functionality
+       - Document what packages you're installing and why
+    10. **USE EXISTING PATTERNS**: Work with the existing tech stack - understand the current architecture before adding new dependencies.
+    11. **SIMPLE SOLUTIONS FIRST**: Try to implement with existing dependencies first, but don't compromise functionality if new packages are clearly needed.
+    12. **EXPLAIN YOUR DECISIONS**: When you install new packages, explain why they're necessary for the requested functionality.
 
-Your workflow:
-1. Analyze the repository to understand its structure and patterns
-2. Create a detailed implementation plan
-3. Read existing files to understand current implementation
-4. Make minimal, targeted changes to implement the feature
-5. Commit and push the changes
+    🔒 FORBIDDEN ACTIONS:
+    - DO NOT modify existing components/functions unless absolutely required for integration
+    - DO NOT refactor or "improve" existing code
+    - DO NOT change existing file structures or move files
+    - DO NOT install packages without understanding why they're needed
+    - DO NOT use bleeding-edge or experimental packages without good reason
+    - DO NOT install multiple packages that do the same thing
+    - DO NOT install packages for functionality the user didn't request
+    - DO NOT change existing styling or CSS unless specifically requested
+    - DO NOT modify existing database schemas unless absolutely required
+    - DO NOT change existing API endpoints unless absolutely required
 
-Always:
-- Think step by step before making changes
-- Consider the existing codebase structure and patterns
-- Write clean, maintainable code
-- Follow best practices for the language/framework
-- Test your changes when possible
-- Provide clear commit messages
-- Preserve existing functionality unless explicitly asked to change it
+    🎯 IMPLEMENTATION STRATEGY:
+    - Analyze the repository first to understand existing languages, frameworks, and patterns
+    - Read dependency files (package.json, requirements.txt, go.mod, Cargo.toml, etc.) to understand available packages
+    - Create new files/components/modules for new functionality
+    - Only modify existing files if integration is impossible without it
+    - When integration is required, make only minimal changes (imports, single component reference, etc.)
+    - Follow existing file naming conventions and directory structure exactly
+    - Maintain consistency with existing code style and patterns
+    - Install new dependencies when explicitly needed for requested functionality (with explanation)
+    - Use only well-established, popular packages for the technology stack being used
 
-Use the available tools to accomplish your tasks. Be thorough and methodical in your approach."""
+    🚀 YOUR WORKFLOW:
+    1. Analyze the repository to understand its structure, language, and framework patterns
+    2. Read dependency files to understand available packages
+    3. Create a detailed implementation plan using existing dependencies or explaining why new ones are needed
+    4. Install any necessary dependencies with proper explanation
+    5. Create new files for new functionality (components, modules, classes, etc.)
+    6. Only if absolutely required: make minimal integration changes to existing files
+    7. Commit and push the changes
+
+    Always:
+    - Think step by step before making changes
+    - Consider the existing codebase structure and patterns
+    - Write clean, maintainable code that works with existing dependencies
+    - Follow best practices for the language/framework
+    - Test your changes when possible
+    - Provide clear commit messages
+    - Preserve ALL existing functionality
+
+    Use the available tools to accomplish your tasks. Be thorough and methodical in your approach.
+
+    🚨 PACKAGE INSTALLATION RULES:
+    - DO NOT install packages without explaining why they're needed for the requested functionality
+    - DO NOT use experimental or bleeding-edge packages without strong justification
+    - DO NOT install multiple packages that serve the same purpose
+    - DO NOT install packages for features the user didn't explicitly requested
+    - DO consider the technology stack when choosing packages (React packages for React apps, Flask packages for Flask apps, etc.)
+
+    🔥 INTEGRATION REQUIREMENTS (NON-NEGOTIABLE):
+    When adding ANY new functionality, you MUST complete FULL integration:
+
+    ✅ STEP 1: Create the necessary files (components, modules, classes, etc.) - NEVER modify existing files for this
+    ✅ STEP 2: Integrate them into the main application with MINIMAL changes to existing files
+
+    Integration means:
+    1. Read the main application files to understand current structure
+    2. Make only the absolute minimum changes to existing files:
+       - Add import/include statement
+       - Add single component reference/route
+       - NO other modifications unless 100% impossible to avoid
+
+    ⛔ MODIFICATION GUIDELINES:
+    - Existing files are SACRED - touch them only if absolutely essential
+    - When you must modify existing files, explain WHY it's impossible to avoid
+    - Make the smallest possible change that enables the new functionality
+    - Never refactor, improve, or change existing code style
+    - Preserve all existing functionality exactly as it is
+
+    ⛔ FAILURE TO PRESERVE EXISTING CODE = UNACCEPTABLE
+    Creating files without proper integration is incomplete, but modifying existing code unnecessarily is WORSE.
+    """
 
     def _create_planning_prompt(self) -> ChatPromptTemplate:
         """Create the prompt for planning."""
@@ -151,25 +220,45 @@ Use the available tools to accomplish your tasks. Be thorough and methodical in 
             ("system", self.system_prompt),
             ("human", """Analyze the repository and create a detailed implementation plan for the following request:
 
-Repository URL: {repo_url}
-Request: {prompt}
+            Repository URL: {repo_url}
+            Request: {prompt}
 
-Repository Analysis:
-{repo_analysis}
+            Repository Analysis:
+            {repo_analysis}
 
-Create a detailed plan with:
-1. Summary of what needs to be done
-2. List of files that need to be created or modified (be specific about file extensions)
-3. Step-by-step implementation approach
-4. Any considerations or potential issues
+            Create a detailed plan with:
+            1. Summary of what needs to be done
+            2. Available dependencies (check package.json/requirements.txt/go.mod/etc.)
+            3. Required new dependencies (if any) and justification for why they're needed
+            4. List of NEW files that need to be created (following existing conventions)
+            5. Minimal changes to existing files (only if absolutely essential for integration)
+            6. Step-by-step implementation approach
+            7. Any considerations or potential issues
 
-IMPORTANT GUIDELINES:
-- Identify existing file patterns (.js vs .jsx, component structure, etc.)
-- Plan to preserve existing code and functionality
-- For React projects, plan to create new components and import them
-- Specify exact file paths and extensions to match existing patterns
+            🚨 CRITICAL PLANNING RULES - EXISTING CODE PRESERVATION:
+            - Plan to create NEW files for new functionality - DO NOT plan to modify existing files unless absolutely essential
+            - If you must modify existing files, justify WHY it's impossible to avoid and plan only minimal changes
+            - Plan to preserve ALL existing functionality exactly as it is
+            - Plan to follow existing patterns and conventions exactly
+            - Plan integration with the smallest possible changes to existing code
 
-Think through this carefully and provide a comprehensive plan."""),
+            DEPENDENCY MANAGEMENT RULES:
+            - First analyze dependency files to understand available packages
+            - If the requested functionality commonly requires specific packages not currently installed, plan to install them with explanation
+            - Choose well-established, popular packages for the technology stack
+            - Explain why new packages are necessary for the requested functionality
+            - Try to use existing dependencies first, but don't compromise functionality
+
+            IMPLEMENTATION APPROACH:
+            - Identify existing language, framework, and code patterns
+            - Plan to create new components/modules/classes in separate files
+            - Plan minimal integration points (imports, single references)
+            - Follow existing file naming conventions and directory structure exactly
+            - Ensure all planned packages are appropriate for the technology stack
+            - Plan to preserve existing code structure and functionality completely
+
+            Think through this carefully and provide a comprehensive plan that prioritizes creating new files over modifying existing ones.
+            """),
             MessagesPlaceholder(variable_name="chat_history")
         ])
     
@@ -177,7 +266,7 @@ Think through this carefully and provide a comprehensive plan."""),
         """Create the prompt for implementation."""
         return ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
-            ("human", "Implement the planned changes for the request: {prompt}. Repository: {repo_url}. Plan: {plan}. Repository analysis: {repo_analysis}. CRITICAL: Read existing files first, preserve all existing code, only add new features incrementally."),
+            ("human", "Implement the planned changes for the request: {prompt}. Repository: {repo_url}. Plan: {plan}. Repository analysis: {repo_analysis}. 🚨 CRITICAL: Create new files for new functionality and make only minimal integration changes to existing files. Read existing files first if you must modify them."),
             MessagesPlaceholder(variable_name="chat_history")
         ])
     
@@ -396,38 +485,62 @@ Repository: {state['repo_url']}
 Repository Path: {state['repo_path']}
 Plan: {json.dumps(state['plan'], indent=2)}
 
-🎯 TASK: Create the files and make the changes as described in the plan.
+🎯 TASK: Create NEW files for new functionality and make only minimal integration changes to existing files.
 
-⚠️ CRITICAL INSTRUCTIONS - FOLLOW THESE EXACTLY:
-1. ALWAYS read existing files before modifying them using read_file
-2. Create new files using write_file
-3. When modifying existing files, preserve ALL existing content and only add new features
-4. Follow the existing patterns in the codebase (.jsx extensions, Tailwind CSS, etc.)
-5. **MANDATORY: COMPLETE THE FULL INTEGRATION** - Don't just create components, integrate them into the app
+🚨 CRITICAL INSTRUCTIONS - EXISTING CODE PRESERVATION:
+1. **DEPENDENCY CHECK**: First read dependency files (package.json, requirements.txt, go.mod, etc.) to understand available packages
+2. **SMART PACKAGE MANAGEMENT**: Install new packages when explicitly needed for requested functionality (with explanation)
+3. **CREATE NEW FILES FIRST**: Always create new files/components/modules for new functionality - DO NOT modify existing files unless absolutely essential
+4. **MINIMAL EXISTING FILE CHANGES**: Only modify existing files if integration is impossible without it, and then make only minimal changes:
+   - Add a single import statement
+   - Add a single component reference
+   - Add a single route/endpoint
+   - NO refactoring, NO style changes, NO "improvements"
+5. **READ BEFORE MODIFYING**: If you must modify an existing file, ALWAYS read it first using read_file to understand current structure
+6. Follow the existing patterns in the codebase (file extensions, naming conventions, code style, etc.) EXACTLY
+
+🔧 PACKAGE INSTALLATION RULES:
+- DO NOT install packages without explaining why they're needed for the requested functionality
+- DO NOT use experimental or bleeding-edge packages without strong justification
+- DO NOT install multiple packages that serve the same purpose
+- DO NOT install packages for features the user didn't explicitly request
+- DO consider the technology stack when choosing packages (React packages for React apps, Flask packages for Flask apps, etc.)
+
+🔒 EXISTING CODE PRESERVATION RULES:
+- Existing files are SACRED - touch them only if absolutely essential for integration
+- When you must modify existing files, explain WHY it's impossible to avoid
+- Make the smallest possible change that enables the new functionality
+- Never refactor, improve, or change existing code style
+- Preserve all existing functionality exactly as it is
 
 🔥 INTEGRATION REQUIREMENTS (NON-NEGOTIABLE):
-When adding ANY new component (button, header, footer, navbar, etc.), you MUST complete BOTH steps:
+When adding ANY new functionality, you MUST complete FULL integration:
 
-✅ STEP 1: Create the component file
-✅ STEP 2: Integrate it into the main application
+✅ STEP 1: Create the necessary files (components, modules, classes, etc.) - NEVER modify existing files for this
+✅ STEP 2: Integrate them into the main application with MINIMAL changes to existing files
 
 Integration means:
-1. Read the main application file (App.jsx, App.js, main.py, index.js, etc.)
-2. Modify the main application file to:
-   - Import the new component at the top
-   - Add the component to the JSX/template/code
-   - Position it correctly (header at top, footer at bottom, etc.)
+1. Read the main application files to understand current structure
+2. Make only the absolute minimum changes to existing files:
+   - Add import/include statement
+   - Add single component reference/route
+   - NO other modifications unless 100% impossible to avoid
 
-⛔ FAILURE TO INTEGRATE = INCOMPLETE TASK
-Creating a component without integrating it into the app is USELESS and INCOMPLETE.
+⛔ MODIFICATION GUIDELINES:
+- Existing files are SACRED - touch them only if absolutely essential
+- When you must modify existing files, explain WHY it's impossible to avoid
+- Make the smallest possible change that enables the new functionality
+- Never refactor, improve, or change existing code style
+- Preserve all existing functionality exactly as it is
 
 🚀 WORKFLOW:
-1. First: Read the main application file to understand its structure
-2. Second: Create the new component file
-3. Third: Modify the main application file to integrate the component
-4. Verify: The component is imported and used in the main app
+1. **First: Read dependency files to understand available packages**
+2. Second: Read the main application files to understand current structure (BUT DO NOT MODIFY THEM YET)
+3. Third: Install any necessary packages (with explanation) and create new files for functionality
+4. Fourth: ONLY if absolutely essential for integration, make minimal changes to existing files
+5. Verify: The new functionality is properly integrated and functional
 
-Start by reading the main application file, then create the component, then integrate it."""
+Start by reading dependency files, then read the main application files, then create new files, and only modify existing files if absolutely essential."""
 
             # Use the LLM with tool calling in a conversation loop
             messages = [
@@ -491,10 +604,214 @@ Start by reading the main application file, then create the component, then inte
                                 
                                 # Track changes
                                 if tool_call['name'] == 'write_file':
+                                    file_path = tool_args.get('file_path', 'unknown')
+                                    
+                                    # Check if this file was read before (indicates it existed)
+                                    file_existed = False
+                                    
+                                    # Check current tool calls for read_file
+                                    if hasattr(response, 'tool_calls') and response.tool_calls:
+                                        for prev_tool_call in response.tool_calls:
+                                            if (prev_tool_call.get('name') == 'read_file' and 
+                                                prev_tool_call.get('args', {}).get('file_path') == file_path):
+                                                file_existed = True
+                                                break
+                                    
+                                    # Also check previous iterations for read_file calls
+                                    if not file_existed:
+                                        for msg in messages:
+                                            if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                                                for prev_tool_call in msg.tool_calls:
+                                                    if (prev_tool_call.get('name') == 'read_file' and 
+                                                        prev_tool_call.get('args', {}).get('file_path') == file_path):
+                                                        file_existed = True
+                                                        break
+                                    
+                                    # Generate descriptive text based on the original prompt and file type
+                                    prompt_lower = state.get('prompt', '').lower()
+                                    
+                                    # Determine file type and generate appropriate description
+                                    if file_path.endswith(('.jsx', '.js', '.ts', '.tsx')):
+                                        # JavaScript/TypeScript/React files
+                                        if 'component' in file_path.lower() and not file_existed:
+                                            # Infer component type from prompt
+                                            if 'sign up' in prompt_lower or 'signup' in prompt_lower:
+                                                description = f"Added new SignUp component with user registration form"
+                                            elif 'login' in prompt_lower:
+                                                description = f"Added new Login component with authentication form"
+                                            elif 'contact' in prompt_lower:
+                                                description = f"Added new Contact component with contact form"
+                                            elif 'button' in prompt_lower:
+                                                description = f"Added new interactive button component"
+                                            elif 'nav' in prompt_lower or 'menu' in prompt_lower:
+                                                description = f"Added new navigation component"
+                                            elif 'footer' in prompt_lower:
+                                                description = f"Added new footer component"
+                                            elif 'header' in prompt_lower:
+                                                description = f"Added new header component"
+                                            elif 'form' in prompt_lower:
+                                                description = f"Added new form component"
+                                            elif 'modal' in prompt_lower or 'popup' in prompt_lower:
+                                                description = f"Added new modal/popup component"
+                                            else:
+                                                component_name = file_path.split('/')[-1].replace('.jsx', '').replace('.js', '').replace('.tsx', '').replace('.ts', '')
+                                                description = f"Added new {component_name} component"
+                                        elif any(main_file in file_path.lower() for main_file in ['app.', 'main.', 'index.']) and file_existed:
+                                            # Main application files
+                                            if 'sign up' in prompt_lower or 'signup' in prompt_lower:
+                                                description = f"Integrated SignUp functionality into main application"
+                                            elif 'login' in prompt_lower:
+                                                description = f"Integrated Login functionality into main application"
+                                            elif 'contact' in prompt_lower:
+                                                description = f"Integrated Contact form into main application"
+                                            else:
+                                                description = f"Enhanced main application with new functionality"
+                                        else:
+                                            # Other JS/TS files
+                                            if file_existed:
+                                                description = f"Updated {file_path} with new functionality"
+                                            else:
+                                                description = f"Created new {file_path} module"
+                                    
+                                    elif file_path.endswith('.py'):
+                                        # Python files
+                                        if 'api' in file_path.lower() or 'endpoint' in file_path.lower() or 'route' in file_path.lower():
+                                            if 'auth' in prompt_lower or 'login' in prompt_lower:
+                                                description = f"Added authentication API endpoints"
+                                            elif 'user' in prompt_lower:
+                                                description = f"Added user management API endpoints"
+                                            elif 'contact' in prompt_lower:
+                                                description = f"Added contact form API endpoint"
+                                            else:
+                                                description = f"Added new API endpoint functionality"
+                                        elif 'model' in file_path.lower():
+                                            if 'user' in prompt_lower:
+                                                description = f"Added User data model"
+                                            elif 'auth' in prompt_lower:
+                                                description = f"Added authentication data model"
+                                            else:
+                                                description = f"Added new data model"
+                                        elif 'service' in file_path.lower():
+                                            description = f"Added new service functionality"
+                                        elif 'test' in file_path.lower():
+                                            description = f"Added test cases"
+                                        elif any(main_file in file_path.lower() for main_file in ['app.py', 'main.py', '__init__.py']) and file_existed:
+                                            description = f"Enhanced main application with new functionality"
+                                        else:
+                                            if file_existed:
+                                                description = f"Enhanced Python module {file_path}"
+                                            else:
+                                                description = f"Created new Python module {file_path}"
+                                    
+                                    elif file_path.endswith(('.go')):
+                                        # Go files
+                                        if 'main.go' in file_path:
+                                            description = f"Enhanced main Go application"
+                                        elif 'handler' in file_path.lower() or 'route' in file_path.lower():
+                                            description = f"Added new HTTP handlers"
+                                        elif 'model' in file_path.lower():
+                                            description = f"Added new data structures"
+                                        elif 'service' in file_path.lower():
+                                            description = f"Added new service functionality"
+                                        else:
+                                            if file_existed:
+                                                description = f"Enhanced Go module {file_path}"
+                                            else:
+                                                description = f"Created new Go module {file_path}"
+                                    
+                                    elif file_path.endswith(('.rs')):
+                                        # Rust files
+                                        if 'main.rs' in file_path or 'lib.rs' in file_path:
+                                            description = f"Enhanced main Rust application"
+                                        elif 'mod.rs' in file_path:
+                                            description = f"Added new Rust module"
+                                        else:
+                                            if file_existed:
+                                                description = f"Enhanced Rust module {file_path}"
+                                            else:
+                                                description = f"Created new Rust module {file_path}"
+                                    
+                                    elif file_path.endswith(('.java', '.kt')):
+                                        # Java/Kotlin files
+                                        if 'Controller' in file_path:
+                                            description = f"Added new REST controller"
+                                        elif 'Service' in file_path:
+                                            description = f"Added new service class"
+                                        elif 'Repository' in file_path:
+                                            description = f"Added new data repository"
+                                        elif 'Model' in file_path or 'Entity' in file_path:
+                                            description = f"Added new data model/entity"
+                                        else:
+                                            if file_existed:
+                                                description = f"Enhanced {file_path}"
+                                            else:
+                                                description = f"Created new {file_path}"
+                                    
+                                    elif file_path.endswith(('.css', '.scss', '.sass', '.less')):
+                                        # Styling files
+                                        if file_existed:
+                                            description = f"Updated styling and visual design"
+                                        else:
+                                            description = f"Added new CSS styles and layout"
+                                    
+                                    elif file_path.endswith(('.html', '.htm')):
+                                        # HTML files
+                                        if file_existed:
+                                            description = f"Updated HTML template and structure"
+                                        else:
+                                            description = f"Created new HTML page template"
+                                    
+                                    elif file_path.endswith(('.php')):
+                                        # PHP files
+                                        if 'index.php' in file_path:
+                                            description = f"Enhanced main PHP application"
+                                        elif 'api' in file_path.lower() or 'endpoint' in file_path.lower():
+                                            description = f"Added new PHP API endpoint"
+                                        else:
+                                            if file_existed:
+                                                description = f"Enhanced PHP module {file_path}"
+                                            else:
+                                                description = f"Created new PHP module {file_path}"
+                                    
+                                    elif file_path.endswith(('.rb')):
+                                        # Ruby files
+                                        if 'controller' in file_path.lower():
+                                            description = f"Added new Rails controller"
+                                        elif 'model' in file_path.lower():
+                                            description = f"Added new Rails model"
+                                        elif 'view' in file_path.lower():
+                                            description = f"Added new Rails view"
+                                        else:
+                                            if file_existed:
+                                                description = f"Enhanced Ruby module {file_path}"
+                                            else:
+                                                description = f"Created new Ruby module {file_path}"
+                                    
+                                    elif file_path.endswith(('.cs', '.vb')):
+                                        # .NET files
+                                        if 'Controller' in file_path:
+                                            description = f"Added new .NET controller"
+                                        elif 'Service' in file_path:
+                                            description = f"Added new .NET service"
+                                        elif 'Model' in file_path:
+                                            description = f"Added new .NET model"
+                                        else:
+                                            if file_existed:
+                                                description = f"Enhanced .NET module {file_path}"
+                                            else:
+                                                description = f"Created new .NET module {file_path}"
+                                    
+                                    else:
+                                        # Generic fallback
+                                        if file_existed:
+                                            description = f"Modified {file_path}"
+                                        else:
+                                            description = f"Created {file_path}"
+                                    
                                     changes_made.append({
-                                        "action": "created/modified",
-                                        "file_path": tool_args.get('file_path', 'unknown'),
-                                        "description": f"File {tool_args.get('file_path', 'unknown')} written"
+                                        "action": "modified" if file_existed else "created",
+                                        "file_path": file_path,
+                                        "description": description
                                     })
                                 
                                 # Create tool result message
@@ -526,58 +843,68 @@ Start by reading the main application file, then create the component, then inte
                     component_creation_done = any(
                         'write_file' in str(tool_call.get('name', '')) and 
                         any(ext in str(tool_call.get('args', {}).get('file_path', '')) 
-                            for ext in ['.jsx', '.js', '.tsx', '.ts', '.vue', '.py'])
+                            for ext in ['.jsx', '.js', '.tsx', '.ts', '.vue', '.py', '.go', '.rs', '.java', '.kt', '.php', '.rb', '.cs'])
                         for tool_call in response.tool_calls
                     )
                     
                     main_file_modification_done = any(
                         'write_file' in str(tool_call.get('name', '')) and 
                         any(main_file in str(tool_call.get('args', {}).get('file_path', '')) 
-                            for main_file in ['App.', 'app.', 'main.', 'index.', 'Main.'])
+                            for main_file in ['App.', 'app.', 'main.', 'index.', 'Main.', '__init__.py'])
                         for tool_call in response.tool_calls
                     )
                     
                     # Check if this was a component creation without integration
                     if component_creation_done and not main_file_modification_done:
-                        continue_prompt = f"""CRITICAL: You created a new component but haven't integrated it into the main application yet!
+                        continue_prompt = f"""🚨 CRITICAL: You created new files but haven't integrated them into the main application yet!
 
 You must complete BOTH steps:
-✅ Step 1: Create the component (DONE)
-❌ Step 2: Integrate it into the main application (NOT DONE)
+✅ Step 1: Create the new files/modules (DONE)
+❌ Step 2: Minimal integration into the main application (NOT DONE)
 
-To complete the integration:
-1. Use read_file to examine the main application file (App.jsx, App.js, main.py, etc.)
-2. Use write_file to modify the main application file to:
-   - Import the new component
-   - Add the component to the JSX/template/code
-   - Ensure it appears in the correct location
+⚠️ INTEGRATION RULES - EXISTING CODE PRESERVATION:
+- Existing files are SACRED - make only minimal changes for integration
+- ONLY add what's absolutely essential: import statement + single component reference
+- NO refactoring, NO style changes, NO "improvements" to existing code
+- Preserve ALL existing functionality exactly as it is
 
-The task is NOT complete until the component is integrated and visible in the main application.
+To complete the minimal integration:
+1. Use read_file to examine the main application files (App.jsx, main.py, main.go, etc.)
+2. Use write_file to make MINIMAL changes to main application files:
+   - Add import/include statement for new functionality
+   - Add single component reference/route where needed
+   - NO other modifications
 
-Please continue with the integration step now."""
+Explain WHY any modification to existing files is absolutely necessary for integration.
+
+Please continue with the minimal integration step now."""
                     
                     elif component_creation_done and main_file_modification_done:
-                        continue_prompt = """Great! You've created the component and integrated it into the main application. 
+                        continue_prompt = """✅ Excellent! You've created new files and made minimal integration changes to the main application. 
 
-Please verify your work:
-1. Did you import the component in the main file?
-2. Did you add the component to the JSX/template in the correct location?
-3. Is the component properly positioned (header at top, footer at bottom, etc.)?
+Please verify your minimal integration:
+1. Did you add only essential imports/includes for the new functionality?
+2. Did you add single component references/routes where needed?
+3. Did you preserve ALL existing functionality exactly as it was?
+4. Did you avoid any refactoring or "improvements" to existing code?
 
-If everything looks correct, respond with 'TASK COMPLETE' and summarize what was accomplished.
+If everything looks correct and you made only minimal necessary changes, respond with 'TASK COMPLETE' and summarize what was accomplished.
 If you need to make any adjustments, continue using the tools."""
                     
                     else:
                         continue_prompt = """Based on the tool results above, analyze what you've accomplished so far:
 
-1. Have you created any new components or files?
-2. Have you integrated them into the main application?
+1. Have you created any new files or modules?
+2. Have you made minimal integration changes to existing files?
 3. Are there any remaining steps from the original plan?
 
-Remember: If you're adding components (buttons, headers, footers, etc.), you MUST:
-- Create the component file
-- Integrate it into the main application file
-- Ensure it's imported and used correctly
+🚨 REMEMBER - EXISTING CODE PRESERVATION:
+- CREATE new files/modules for new functionality (preferred approach)
+- Only modify existing files if integration is impossible without it
+- When modifying existing files, make only minimal changes (imports + single references)
+- Always read existing files first to understand current structure
+- Preserve ALL existing functionality exactly as it is
+- NO refactoring, NO style changes, NO "improvements"
 
 Continue with the next necessary step, or respond with 'TASK COMPLETE' if everything is done."""
                     
@@ -605,33 +932,33 @@ Continue with the next necessary step, or respond with 'TASK COMPLETE' if everyt
             
             # Final validation to ensure integration was completed
             if changes_made:
-                component_files = [
+                new_functionality_files = [
                     change for change in changes_made 
-                    if any(ext in change.get("file_path", "") for ext in ['.jsx', '.js', '.tsx', '.ts', '.vue', '.py'])
-                    and not any(main_file in change.get("file_path", "") for main_file in ['App.', 'app.', 'main.', 'index.', 'Main.'])
+                    if any(ext in change.get("file_path", "") for ext in ['.jsx', '.js', '.tsx', '.ts', '.vue', '.py', '.go', '.rs', '.java', '.kt', '.php', '.rb', '.cs'])
+                    and not any(main_file in change.get("file_path", "") for main_file in ['App.', 'app.', 'main.', 'index.', 'Main.', '__init__.py'])
                 ]
                 
                 main_app_files = [
                     change for change in changes_made 
-                    if any(main_file in change.get("file_path", "") for main_file in ['App.', 'app.', 'main.', 'index.', 'Main.'])
+                    if any(main_file in change.get("file_path", "") for main_file in ['App.', 'app.', 'main.', 'index.', 'Main.', '__init__.py'])
                 ]
                 
-                if component_files and not main_app_files:
-                    # Component was created but main app wasn't modified - this is incomplete
-                    print("⚠️ WARNING: Component created but main application not modified - integration may be incomplete!")
+                if new_functionality_files and not main_app_files:
+                    # Files were created but main app wasn't modified - this may be incomplete
+                    print("⚠️ WARNING: New files created but main application not modified - integration may be incomplete!")
                     self.telemetry.log_event(
                         "Potential incomplete integration detected",
                         correlation_id=state["correlation_id"],
-                        component_files=[c.get("file_path") for c in component_files],
+                        new_files=[c.get("file_path") for c in new_functionality_files],
                         main_app_files=[c.get("file_path") for c in main_app_files],
                         level="warning"
                     )
-                elif component_files and main_app_files:
-                    print("✅ Integration appears complete - component created and main app modified")
+                elif new_functionality_files and main_app_files:
+                    print("✅ Integration appears complete - new functionality created and main app modified appropriately")
                     self.telemetry.log_event(
                         "Integration completed successfully",
                         correlation_id=state["correlation_id"],
-                        component_files=[c.get("file_path") for c in component_files],
+                        new_files=[c.get("file_path") for c in new_functionality_files],
                         main_app_files=[c.get("file_path") for c in main_app_files]
                     )
             
@@ -680,13 +1007,6 @@ Continue with the next necessary step, or respond with 'TASK COMPLETE' if everyt
                 state["branch_name"] = branch_name
                 
                 # Create the branch first
-                await self._send_streaming_update(
-                    state["correlation_id"], 
-                    f"🌿 Creating branch: {branch_name}...", 
-                    progress=68, 
-                    step="Creating branch"
-                )
-                
                 create_branch_tool = next(t for t in self.tools if t.name == "create_branch")
                 branch_result = await create_branch_tool.ainvoke({
                     "correlation_id": state["correlation_id"],
@@ -699,21 +1019,8 @@ Continue with the next necessary step, or respond with 'TASK COMPLETE' if everyt
             else:
                 # Branch already exists from implement_changes_node
                 branch_name = state["branch_name"]
-                await self._send_streaming_update(
-                    state["correlation_id"], 
-                    f"📝 Using existing branch: {branch_name}...", 
-                    progress=68, 
-                    step="Using existing branch"
-                )
             
             # Commit the changes
-            await self._send_streaming_update(
-                state["correlation_id"], 
-                f"📝 Committing changes to branch: {branch_name}...", 
-                progress=72, 
-                step="Committing changes"
-            )
-            
             commit_tool = next(t for t in self.tools if t.name == "commit_changes")
             result = await commit_tool.ainvoke({
                 "correlation_id": state["correlation_id"],
@@ -781,14 +1088,6 @@ Continue with the next necessary step, or respond with 'TASK COMPLETE' if everyt
                 raise ValueError("correlation_id missing in state at create_pull_request_node")
             self._log_node_start("create_pull_request", state)
             
-            # Send initial progress update
-            await self._send_streaming_update(
-                state["correlation_id"], 
-                "📄 Creating pull request...", 
-                progress=90, 
-                step="Creating Pull Request"
-            )
-            
             state["current_step"] = "create_pull_request"
             state["last_update"] = datetime.utcnow()
             
@@ -826,72 +1125,52 @@ Continue with the next necessary step, or respond with 'TASK COMPLETE' if everyt
 {prompt}
 
 ## 🚀 What Was Done
-This pull request implements the requested changes by completing the following actions:
-
 """
             
-            # Add implementation details
-            if plan_steps and isinstance(plan_steps, list):
-                # Filter out agent workflow steps and focus on code changes
-                code_related_steps = []
-                for step in plan_steps[:10]:  # Look at more steps to filter
-                    if isinstance(step, dict):
-                        step_text = step.get('description', str(step))
+            # Add what was actually accomplished in simple bullet points
+            if state.get("changes_made"):
+                for change in state["changes_made"]:
+                    file_path = change.get("file_path", "unknown")
+                    description = change.get("description", "")
+                    action = change.get("action", "modified")
+                    
+                    # Use the descriptive text from the change description
+                    if description and description != f"File {file_path} written":
+                        pr_body += f"• {description}\n"
                     else:
-                        step_text = str(step)
-                    
-                    # Filter out agent workflow steps
-                    workflow_keywords = [
-                        'analyze', 'analysed', 'analyzed', 'repository', 'structure',
-                        'understand', 'read', 'examine', 'review', 'study',
-                        'plan', 'planning', 'create plan', 'implementation plan',
-                        'workflow', 'process', 'approach', 'strategy'
-                    ]
-                    
-                    # Keep steps that are about actual code implementation
-                    step_lower = step_text.lower()
-                    is_workflow_step = any(keyword in step_lower for keyword in workflow_keywords)
-                    is_code_step = any(keyword in step_lower for keyword in [
-                        'create', 'add', 'implement', 'build', 'write', 'modify', 
-                        'update', 'integrate', 'import', 'component', 'function',
-                        'class', 'file', 'code', 'style', 'css', 'jsx', 'js',
-                        'html', 'python', 'install', 'configure', 'setup'
-                    ])
-                    
-                    if is_code_step and not is_workflow_step:
-                        code_related_steps.append(step_text)
-                
-                if code_related_steps:
-                    pr_body += "### Implementation Steps:\n"
-                    for i, step in enumerate(code_related_steps[:5], 1):  # Limit to 5 steps
-                        pr_body += f"{i}. {step}\n"
-                    pr_body += "\n"
+                        # Fallback to action-based description
+                        if action == "created":
+                            pr_body += f"• Created {file_path}\n"
+                        elif action == "modified":
+                            pr_body += f"• Modified {file_path}\n"
+                        else:
+                            pr_body += f"• {action.title()} {file_path}\n"
+            else:
+                pr_body += "• Implemented requested changes\n"
             
-            # Add file changes section
-            pr_body += "## 📁 Files Changed\n\n"
+            # Add files changed section
+            pr_body += f"""
+## 📁 Files Changed
+"""
             
             if files_created:
-                pr_body += "### ✅ Files Created:\n"
-                pr_body += "\n".join(files_created) + "\n\n"
+                pr_body += "**Files Created:**\n"
+                for file_info in files_created:
+                    # Extract just the file path from the full description
+                    file_path = file_info.split("**")[1].split("**")[0] if "**" in file_info else file_info.replace("- ", "")
+                    pr_body += f"• {file_path}\n"
+                pr_body += "\n"
             
             if files_modified:
-                pr_body += "### 📝 Files Modified:\n"
-                pr_body += "\n".join(files_modified) + "\n\n"
+                pr_body += "**Files Modified:**\n"
+                for file_info in files_modified:
+                    # Extract just the file path from the full description  
+                    file_path = file_info.split("**")[1].split("**")[0] if "**" in file_info else file_info.replace("- ", "")
+                    pr_body += f"• {file_path}\n"
+                pr_body += "\n"
             
             if not files_created and not files_modified:
-                pr_body += "- No specific file changes detected\n\n"
-            
-            # Add summary of changes
-            total_changes = len(files_created) + len(files_modified)
-            if total_changes > 0:
-                pr_body += f"### 📊 Summary:\n"
-                pr_body += f"- **{len(files_created)}** file(s) created\n"
-                pr_body += f"- **{len(files_modified)}** file(s) modified\n"
-                pr_body += f"- **{total_changes}** total changes\n\n"
-            
-            # Add implementation plan context
-            if plan_summary and plan_summary != "No plan summary available":
-                pr_body += f"## 🗺️ Implementation Plan\n{plan_summary}\n\n"
+                pr_body += "• No specific files detected\n\n"
             
             pr_body += "---\n*This pull request was automatically created by **Backspace AI Coding Agent***"
             
@@ -900,7 +1179,7 @@ This pull request implements the requested changes by completing the following a
                 await self._send_streaming_update(
                     state["correlation_id"], 
                     f"🔗 Creating pull request: {pr_title}...", 
-                    progress=95, 
+                    progress=90, 
                     step="Creating Pull Request"
                 )
                 
@@ -1167,7 +1446,7 @@ This pull request implements the requested changes by completing the following a
                 remaining_content = match.group(2)
                 
                 # Clean the file path
-                file_path = file_path.replace('workspace/Personal-Website/', '').replace('`', '').strip()
+                file_path = clean_file_path(file_path.strip())
                 
                 # Find the code block immediately after
                 code_match = re.search(code_block_pattern, remaining_content, re.DOTALL)
@@ -1185,40 +1464,6 @@ This pull request implements the requested changes by completing the following a
                         "needs_smart_integration": action == "modify"
                     })
             
-            # Also try to find modification patterns
-            modify_patterns = [
-                r'### Step 2: Modify.*?App.*?Component.*?```jsx\s*\n(.*?)```',
-                r'modify.*?main.*?file.*?```jsx\s*\n(.*?)```',
-                r'update.*?app.*?component.*?```jsx\s*\n(.*?)```'
-            ]
-            
-            for pattern in modify_patterns:
-                modify_matches = re.finditer(pattern, content, re.DOTALL | re.IGNORECASE)
-                for match in modify_matches:
-                    file_content = match.group(1).strip()
-                    
-                    # Look for main app files in the existing files
-                    app_files = [f for f in existing_files_content.keys() if 'app' in f.lower() and f.endswith(('.js', '.jsx', '.ts', '.tsx'))]
-                    if app_files:
-                        file_path = app_files[0]
-                    else:
-                        # Try common patterns
-                        common_app_files = ["src/App.jsx", "src/App.js", "src/App.tsx", "src/App.ts", "App.jsx", "App.js"]
-                        for common_file in common_app_files:
-                            if common_file in existing_files_content:
-                                file_path = common_file
-                                break
-                        else:
-                            file_path = "src/App.jsx"  # Default fallback
-                    
-                    file_changes.append({
-                        "action": "modify",
-                        "file_path": file_path,
-                        "content": file_content,
-                        "description": f"Modify {file_path} to integrate component",
-                        "needs_smart_integration": True
-                    })
-            
             if file_changes:
                 return {
                     "file_changes": file_changes,
@@ -1226,100 +1471,9 @@ This pull request implements the requested changes by completing the following a
                     "success": True
                 }
             else:
-                # Fallback: try even more flexible patterns
-                # Look for any code blocks that might be files
-                all_code_blocks = re.finditer(r'```(?:jsx?|js|tsx?|ts|css|html|json|md|txt|cjs|mjs|yml|yaml)\s*\n(.*?)```', content, re.DOTALL)
-                
-                for i, match in enumerate(all_code_blocks):
-                    file_content = match.group(1).strip()
-                    
-                    # Try to infer the file path from context
-                    # Look for file mentions in the preceding text
-                    preceding_text = content[:match.start()]
-                    
-                    # Look for footer component creation
-                    if 'footer' in preceding_text.lower() and 'component' in preceding_text.lower():
-                        # Determine appropriate file path based on existing files
-                        if any('components/' in f for f in existing_files_content.keys()):
-                            file_path = "src/components/Footer.jsx"
-                        elif any('src/' in f for f in existing_files_content.keys()):
-                            file_path = "src/Footer.jsx"
-                        else:
-                            file_path = "Footer.jsx"
-                            
-                        file_changes.append({
-                            "action": "create",
-                            "file_path": file_path,
-                            "content": file_content,
-                            "description": f"Create Footer component at {file_path}",
-                            "needs_smart_integration": False
-                        })
-                    # Look for main app file modification
-                    elif ('app' in preceding_text.lower() or 'main' in preceding_text.lower()) and ('modify' in preceding_text.lower() or 'import' in file_content.lower()):
-                        # Try to infer the actual file path from context
-                        file_path_match = re.search(r'(src/[A-Za-z0-9_/]+\.jsx?)', preceding_text)
-                        if file_path_match:
-                            file_path = file_path_match.group(1)
-                        else:
-                            # Look for main app files in the existing files
-                            app_files = [f for f in existing_files_content.keys() if 'app' in f.lower() and f.endswith(('.js', '.jsx', '.ts', '.tsx'))]
-                            if app_files:
-                                file_path = app_files[0]
-                            else:
-                                # Try common patterns
-                                common_app_files = ["src/App.jsx", "src/App.js", "src/App.tsx", "src/App.ts", "App.jsx", "App.js"]
-                                for common_file in common_app_files:
-                                    if common_file in existing_files_content:
-                                        file_path = common_file
-                                        break
-                                else:
-                                    file_path = "src/App.jsx"  # Default fallback
-                        
-                        file_changes.append({
-                            "action": "modify",
-                            "file_path": file_path,
-                            "content": file_content,
-                            "description": f"Modify {file_path} to integrate component",
-                            "needs_smart_integration": True
-                        })
-                    # Generic file creation/modification
-                    else:
-                        # Try to infer file type and path from content
-                        file_path = f"generated_file_{i}.jsx"  # Default
-                        
-                        # If it looks like a component (has JSX), give it a component name
-                        if 'export' in file_content and ('jsx' in file_content.lower() or '<' in file_content):
-                            if any('components/' in f for f in existing_files_content.keys()):
-                                file_path = f"src/components/GeneratedComponent_{i}.jsx"
-                            elif any('src/' in f for f in existing_files_content.keys()):
-                                file_path = f"src/GeneratedComponent_{i}.jsx"
-                            else:
-                                file_path = f"GeneratedComponent_{i}.jsx"
-                        # If it looks like a Python file
-                        elif 'def ' in file_content or 'import ' in file_content:
-                            file_path = f"generated_module_{i}.py"
-                        # If it looks like CSS
-                        elif '{' in file_content and '}' in file_content and ('color' in file_content.lower() or 'font' in file_content.lower()):
-                            file_path = f"generated_styles_{i}.css"
-                        
-                        file_changes.append({
-                            "action": "create",
-                            "file_path": file_path,
-                            "content": file_content,
-                            "description": f"Create {file_path}",
-                            "needs_smart_integration": False
-                        })
-            
-            if file_changes:
-                return {
-                    "file_changes": file_changes,
-                    "description": f"Implementation with {len(file_changes)} inferred file changes",
-                    "success": True
-                }
-            else:
                 return {
                     "file_changes": [],
-                    "description": "No file changes detected in any format",
+                    "description": "No file changes detected",
                     "success": False,
                     "error": "Could not parse any file changes from LLM response"
                 }
@@ -1333,100 +1487,24 @@ This pull request implements the requested changes by completing the following a
                 "error": str(e)
             }
     
-    def _apply_incremental_changes(self, existing_content: str, modifications: List[Dict[str, Any]], fallback_content: str) -> str:
-        """Apply incremental changes to existing content."""
+    async def cleanup(self, correlation_id: str = None):
+        """Cleanup resources including sandbox containers."""
         try:
-            if not existing_content:
-                return fallback_content
-            
-            modified_content = existing_content
-            
-            for mod in modifications:
-                if mod["type"] == "add":
-                    content_to_add = mod["content"]
-                    
-                    # If it's an import, add it at the top
-                    if "import" in content_to_add.lower():
-                        lines = modified_content.split('\n')
-                        # Find the last import line
-                        last_import_idx = -1
-                        for i, line in enumerate(lines):
-                            if line.strip().startswith('import'):
-                                last_import_idx = i
-                        
-                        if last_import_idx >= 0:
-                            lines.insert(last_import_idx + 1, content_to_add)
-                        else:
-                            lines.insert(0, content_to_add)
-                        
-                        modified_content = '\n'.join(lines)
-                    
-                    # If it's a component, add it before the last closing tag
-                    elif '</' in content_to_add and '>' in content_to_add:
-                        # Find the last closing div or main tag
-                        import re
-                        closing_patterns = [r'(\s*</div>\s*</div>\s*$)', r'(\s*</main>\s*</div>\s*$)', r'(\s*</div>\s*$)']
-                        
-                        for pattern in closing_patterns:
-                            match = re.search(pattern, modified_content, re.MULTILINE)
-                            if match:
-                                insertion_point = match.start()
-                                modified_content = (
-                                    modified_content[:insertion_point] + 
-                                    f"        {content_to_add}\n" + 
-                                    modified_content[insertion_point:]
-                                )
-                                break
-                        else:
-                            # Fallback: add at the end
-                            modified_content += f"\n{content_to_add}"
-            
-            return modified_content
-            
-        except Exception as e:
-            logger.warning(f"Failed to apply incremental changes: {e}")
-            return fallback_content if fallback_content else existing_content
-    
-    def _extract_changes_from_agent_result(self, result: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Extract changes from the agent execution result."""
-        changes = []
-        
-        # Extract from intermediate steps if available
-        if "intermediate_steps" in result:
-            for step in result["intermediate_steps"]:
-                action, observation = step
-                
-                if hasattr(action, 'tool') and action.tool == "write_file":
-                    # Extract file path from tool input
-                    tool_input = action.tool_input
-                    file_path = tool_input.get("file_path", "unknown")
-                    
-                    changes.append({
-                        "action": "created/modified",
-                        "file_path": file_path,
-                        "description": f"File {file_path} written by agent"
-                    })
-        
-        # If no intermediate steps, try to infer from output
-        if not changes and "output" in result:
-            output = result["output"]
-            if "created" in output.lower() or "modified" in output.lower():
-                changes.append({
-                    "action": "implemented",
-                    "file_path": "multiple files",
-                    "description": "Changes implemented by agent"
-                })
-        
-        return changes
-    
-    async def cleanup(self):
-        """Cleanup resources."""
-        try:
-            pass
+            if correlation_id and self.sandbox_service:
+                await self.sandbox_service.cleanup_sandbox(correlation_id)
+                self.telemetry.log_event(
+                    "Sandbox cleaned up after workflow completion",
+                    correlation_id=correlation_id
+                )
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
+            self.telemetry.log_error(
+                e,
+                context={"correlation_id": correlation_id, "operation": "cleanup"},
+                correlation_id=correlation_id
+            )
 
 
 def create_coding_agent() -> CodingAgent:
     """Create a new coding agent instance."""
-    return CodingAgent() 
+    return CodingAgent()

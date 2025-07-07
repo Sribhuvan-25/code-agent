@@ -5,9 +5,11 @@ Base LangGraph agent for the Backspace Coding Agent.
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TypedDict, Union
 
+from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.tools import BaseTool
 from langgraph.graph import END, StateGraph
@@ -16,6 +18,9 @@ from langsmith import Client
 
 from app.core.config import settings
 from app.core.telemetry import get_telemetry
+
+# Load environment variables
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +65,30 @@ class BaseAgent:
     
     def __init__(self):
         self.telemetry = get_telemetry()
-        self.langsmith_client = Client() if settings.langsmith_api_key else None
+        
+        # Initialize LangSmith client and configure tracing directly from .env
+        langsmith_api_key = os.getenv("LANGSMITH_API_KEY")
+        if langsmith_api_key:
+            self.langsmith_client = Client(
+                api_key=langsmith_api_key,
+                api_url=os.getenv("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com")
+            )
+            
+            # Enable LangChain tracing
+            os.environ["LANGCHAIN_TRACING_V2"] = "true"
+            os.environ["LANGCHAIN_API_KEY"] = langsmith_api_key
+            os.environ["LANGCHAIN_PROJECT"] = os.getenv("LANGSMITH_PROJECT", "backspace-agent")
+            os.environ["LANGCHAIN_ENDPOINT"] = os.getenv("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com")
+            
+            logger.info(f"LangSmith tracing enabled for project: {os.getenv('LANGSMITH_PROJECT', 'backspace-agent')}")
+        else:
+            self.langsmith_client = None
+            logger.info("LangSmith tracing disabled - no API key provided")
         
         self.graph = self._build_graph()
+        
+        # Print the compiled graph diagram
+        self._print_graph_diagram()
         
     def _build_graph(self) -> StateGraph:
         """Build the LangGraph state graph."""
@@ -385,6 +411,16 @@ class BaseAgent:
                 errors_count=len(final_state["errors"])
             )
             
+            # Cleanup sandbox container after workflow completion
+            try:
+                await self.cleanup(correlation_id)
+            except Exception as cleanup_error:
+                self.telemetry.log_error(
+                    cleanup_error,
+                    context={"correlation_id": correlation_id, "operation": "post_workflow_cleanup"},
+                    correlation_id=correlation_id
+                )
+            
             return {
                 "success": len(final_state["errors"]) == 0,
                 "correlation_id": correlation_id,
@@ -399,8 +435,45 @@ class BaseAgent:
                 correlation_id=correlation_id
             )
             
+            # Cleanup sandbox container even if workflow failed
+            try:
+                await self.cleanup(correlation_id)
+            except Exception as cleanup_error:
+                self.telemetry.log_error(
+                    cleanup_error,
+                    context={"correlation_id": correlation_id, "operation": "error_cleanup"},
+                    correlation_id=correlation_id
+                )
+            
             return {
                 "success": False,
                 "correlation_id": correlation_id,
                 "error": str(e)
-            } 
+            }
+    
+    def _print_graph_diagram(self):
+        """Print the compiled LangGraph diagram."""
+        try:
+            print("\n" + "="*80)
+            print("🔗 LANGGRAPH WORKFLOW DIAGRAM")
+            print("="*80)
+            
+            # Get the Mermaid diagram
+            mermaid_diagram = self.graph.get_graph().draw_mermaid()
+            print(mermaid_diagram)
+            
+            print("="*80)
+            print("🎯 Graph compiled successfully with the above workflow structure")
+            print("="*80 + "\n")
+            
+        except Exception as e:
+            logger.warning(f"Could not display graph diagram: {e}")
+            print("\n" + "="*80)
+            print("🔗 LANGGRAPH WORKFLOW COMPILED")
+            print("="*80)
+            print("✅ Graph compiled successfully (diagram display unavailable)")
+            print("="*80 + "\n")
+    
+    async def cleanup(self, correlation_id: str = None):
+        """Cleanup resources. Override in subclasses for specific cleanup logic."""
+        pass 

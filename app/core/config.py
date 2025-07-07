@@ -55,9 +55,9 @@ class Settings(BaseSettings):
     rate_limit_window: int = Field(default=60, description="Rate limit window in seconds")
     
     # LangSmith Configuration
-    langsmith_api_key: Optional[str] = None
-    langsmith_project: str = "backspace-coding-agent"
-    langsmith_endpoint: str = "https://api.smith.langchain.com"
+    langsmith_api_key: Optional[str] = Field(default=None, description="LangSmith API Key")
+    langsmith_project: str = Field(default="backspace-coding-agent", description="LangSmith project name")
+    langsmith_endpoint: str = Field(default="https://api.smith.langchain.com", description="LangSmith API endpoint")
     
     # AI Provider Configuration
     ai_provider: str = "openai"  # "openai" or "anthropic"

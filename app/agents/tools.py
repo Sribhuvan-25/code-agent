@@ -62,28 +62,157 @@ class AnalyzeRepositoryTool(BaseTool):
             file_types = set()
             key_files = []
             languages = set()
+            dependencies = {}
             
             for f in files:
                 ext = os.path.splitext(f)[1]
                 if ext:
                     file_types.add(ext)
-                if os.path.basename(f).lower() in {"readme.md", "main.py", "app.js", "index.js", "index.html"}:
+                if os.path.basename(f).lower() in {
+                    "readme.md", "main.py", "app.js", "index.js", "index.html", "package.json",
+                    "requirements.txt", "pipfile", "pyproject.toml", "go.mod", "cargo.toml",
+                    "main.go", "lib.rs", "main.rs", "composer.json", "gemfile", "pom.xml",
+                    "build.gradle", "dockerfile", "docker-compose.yml", "makefile"
+                }:
                     key_files.append(f)
                 if ext in {".py"}:
                     languages.add("Python")
-                elif ext in {".js", ".jsx", ".ts", ".tsx"}:
+                elif ext in {".js", ".jsx", ".ts", ".tsx", ".mjs"}:
                     languages.add("JavaScript/TypeScript")
-                elif ext in {".html"}:
+                elif ext in {".go"}:
+                    languages.add("Go")
+                elif ext in {".rs"}:
+                    languages.add("Rust")
+                elif ext in {".java", ".kotlin", ".scala"}:
+                    languages.add("JVM Languages")
+                elif ext in {".php"}:
+                    languages.add("PHP")
+                elif ext in {".rb"}:
+                    languages.add("Ruby")
+                elif ext in {".cs", ".vb"}:
+                    languages.add(".NET")
+                elif ext in {".cpp", ".cc", ".cxx", ".c", ".h", ".hpp"}:
+                    languages.add("C/C++")
+                elif ext in {".swift"}:
+                    languages.add("Swift")
+                elif ext in {".html", ".htm"}:
                     languages.add("HTML")
-                elif ext in {".css", ".scss", ".sass"}:
-                    languages.add("CSS/Sass")
+                elif ext in {".css", ".scss", ".sass", ".less"}:
+                    languages.add("CSS/Styling")
+            
+            # Step 4: Check for dependency files and extract dependencies
+            dependency_files = []
+            dependencies = {}
+            
+            # Look for various dependency file types
+            dependency_patterns = {
+                "package.json": "javascript",
+                "requirements.txt": "python", 
+                "Pipfile": "python",
+                "pyproject.toml": "python",
+                "go.mod": "go",
+                "Cargo.toml": "rust", 
+                "composer.json": "php",
+                "Gemfile": "ruby",
+                "pom.xml": "java",
+                "build.gradle": "java",
+                "packages.config": "csharp",
+                "*.csproj": "csharp"
+            }
+            
+            for f in files:
+                filename = os.path.basename(f).lower()
+                for pattern, lang in dependency_patterns.items():
+                    if pattern.startswith("*"):
+                        # Handle wildcard patterns like *.csproj
+                        if filename.endswith(pattern[1:]):
+                            dependency_files.append({"file": f, "type": lang, "format": pattern})
+                    elif filename == pattern:
+                        dependency_files.append({"file": f, "type": lang, "format": pattern})
+            
+            # Parse dependency files
+            for dep_file in dependency_files:
+                try:
+                    content = await self._git_service.get_file_content(
+                        correlation_id=correlation_id,
+                        repo_path=repo_path,
+                        file_path=dep_file["file"],
+                        sandbox_service=self._sandbox_service
+                    )
+                    
+                    # Parse based on file type
+                    if dep_file["format"] == "package.json":
+                        import json
+                        package_data = json.loads(content)
+                        dependencies[dep_file["format"]] = {
+                            "dependencies": package_data.get("dependencies", {}),
+                            "devDependencies": package_data.get("devDependencies", {}),
+                            "peerDependencies": package_data.get("peerDependencies", {}),
+                            "optionalDependencies": package_data.get("optionalDependencies", {})
+                        }
+                    elif dep_file["format"] == "requirements.txt":
+                        # Parse requirements.txt format
+                        lines = content.strip().split('\n')
+                        deps = {}
+                        for line in lines:
+                            line = line.strip()
+                            if line and not line.startswith('#'):
+                                # Extract package name (before ==, >=, etc.)
+                                pkg_name = line.split('==')[0].split('>=')[0].split('<=')[0].split('~=')[0].strip()
+                                deps[pkg_name] = line
+                        dependencies[dep_file["format"]] = {"dependencies": deps}
+                    elif dep_file["format"] in ["Pipfile", "pyproject.toml", "Cargo.toml"]:
+                        # These are TOML format files
+                        try:
+                            import toml
+                            toml_data = toml.loads(content)
+                            if dep_file["format"] == "Pipfile":
+                                dependencies[dep_file["format"]] = {
+                                    "packages": toml_data.get("packages", {}),
+                                    "dev-packages": toml_data.get("dev-packages", {})
+                                }
+                            elif dep_file["format"] == "Cargo.toml":
+                                dependencies[dep_file["format"]] = {
+                                    "dependencies": toml_data.get("dependencies", {}),
+                                    "dev-dependencies": toml_data.get("dev-dependencies", {})
+                                }
+                            elif dep_file["format"] == "pyproject.toml":
+                                dependencies[dep_file["format"]] = {
+                                    "dependencies": toml_data.get("project", {}).get("dependencies", []),
+                                    "optional-dependencies": toml_data.get("project", {}).get("optional-dependencies", {})
+                                }
+                        except ImportError:
+                            dependencies[dep_file["format"]] = {"error": "TOML parser not available"}
+                    else:
+                        # For other formats, just store the raw content for now
+                        dependencies[dep_file["format"]] = {"raw_content": content[:500] + "..." if len(content) > 500 else content}
+                    
+                    # Log analysis for common dependencies
+                    self._telemetry.log_event(
+                        f"Dependency file analyzed: {dep_file['format']}",
+                        correlation_id=correlation_id,
+                        language=dep_file["type"],
+                        file_path=dep_file["file"]
+                    )
+                    
+                except Exception as e:
+                    self._telemetry.log_event(
+                        f"Failed to parse {dep_file['format']}",
+                        correlation_id=correlation_id,
+                        error=str(e),
+                        level="warning"
+                    )
+                    dependencies[dep_file["format"]] = {"error": f"Failed to parse: {str(e)}"}
             
             analysis = {
                 "repo_path": repo_path,
                 "files": files,
                 "file_types": list(file_types),
                 "key_files": key_files,
-                "languages": list(languages)
+                "languages": list(languages),
+                "dependencies": dependencies,
+                "dependency_files": dependency_files,
+                "has_dependencies": len(dependency_files) > 0
             }
             
             self._telemetry.log_event(
