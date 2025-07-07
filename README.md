@@ -126,6 +126,32 @@
       style M fill:#27ae60,stroke:#2c3e50,stroke-width:2px,color:#fff
    ```
 
+   ### **Component Breakdown**
+
+   **FastAPI Server:** Handles HTTP requests, manages streaming connections, and orchestrates the overall workflow
+
+   **LangGraph Agent:** The core AI agent that contains the entire 6-step workflow:
+   - `analyze_repository` - Understands codebase structure and dependencies
+   - `create_plan` - Generates detailed implementation plans
+   - `implement_changes` - Writes code and executes changes using tools
+   - `commit_changes` - Creates meaningful git commits
+   - `push_changes` - Pushes to remote repository
+   - `create_pull_request` - Generates PRs with detailed descriptions
+
+   **Streaming Service:** Provides real-time progress updates via Server-Sent Events
+
+   **Docker Sandbox:** Isolated execution environment where all code runs safely
+
+   **Tools:** 7 specialized tools that LangGraph nodes can call:
+   - `analyze_repository`, `read_file`, `write_file`, `execute_command`, `create_branch`, `commit_changes`, `push_changes`
+
+   **Services:** Core services that power the system:
+   - `SandboxService` - Manages Docker containers and command execution
+   - `GitService` - Handles all git operations and GitHub API calls
+   - `StreamingService` - Manages real-time event streaming
+
+   **LangSmith Integration:** Traces every decision and tool call for debugging and optimization
+
    ### **LangGraph Workflow Architecture**
 
    Our agent uses a state-machine approach with LangGraph, ensuring deterministic execution:
@@ -194,22 +220,6 @@
    - **`create_pull_request`** - Generates PRs with detailed descriptions
 
    Each tool is isolated, testable, and has specific security boundaries.
-
-   ### **Component Breakdown**
-
-   **FastAPI Server:** Handles HTTP requests and manages the overall workflow
-
-   **Streaming Service:** Provides real-time updates via Server-Sent Events so users can see progress
-
-   **LangGraph Agent:** The core decision-making component that orchestrates the entire workflow
-
-   **Planning Engine:** Analyzes requirements and creates step-by-step implementation plans
-
-   **Implementation Engine:** The heart of the system - actually writes code and executes changes
-
-   **Git Operations:** Handles all version control operations and PR creation
-
-   **LangSmith Integration:** Traces every decision for debugging and optimization
 
    ## 🐳 **Docker Sandbox Implementation**
 
