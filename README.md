@@ -83,15 +83,6 @@
 
    4. **Open your browser:** `http://localhost:8000`
 
-   ### **Kill All Sessions (when needed)**
-   ```bash
-   # Use our handy script
-   ./kill_sessions.sh
-
-   # Or manually
-   pkill -f uvicorn && docker kill $(docker ps -q)
-   ```
-
    ## 🏗️ **Architecture Overview**
 
    Here's how I built the system using LangGraph + Docker sandboxing:
