@@ -152,6 +152,31 @@
 
    **LangSmith Integration:** Traces every decision and tool call for debugging and optimization
 
+   ### **Why This Architecture?**
+
+   I chose the **LangGraph state machine approach** over other patterns for specific reasons:
+
+   **The Problem:** Traditional AI agents often fail in production because they:
+   - Make unreliable decisions without proper state management
+   - Can't recover from failures gracefully  
+   - Don't ensure complete task execution (might create files but forget integration)
+   - Are difficult to debug when something goes wrong
+   - Don't handle network failures or API rate limits well
+
+   **Why LangGraph State Machine:**
+
+   1. **Deterministic Execution:** Each step must complete successfully before moving to the next. No partial implementations or inconsistent states.
+
+   2. **Robust Error Handling:** If any step fails, the `handle_error` node can retry the entire workflow up to 3 times. This handles network issues, API rate limits, and temporary failures automatically.
+
+   3. **Complete Task Validation:** The `implement_changes` node uses an internal conversation loop to ensure BOTH file creation AND proper integration happen. Traditional agents often create files but forget to integrate them.
+
+   4. **Full Observability:** Every decision, tool call, and state transition is traced through LangSmith. When something goes wrong, you can see exactly why the agent made specific choices.
+
+   5. **Production Ready:** The state machine approach provides the reliability needed for production use cases where partial failures aren't acceptable.
+
+   This architecture focuses on building an AI agent that reliably understands existing codebases, makes intelligent changes, integrates them properly, and handles failures gracefully.
+
    ### **LangGraph Workflow Architecture**
 
    Our agent uses a state-machine approach with LangGraph, ensuring deterministic execution:
@@ -262,12 +287,12 @@
    - **Root container + user switching**: Allows package installation while running user code safely  
    - **Resource limits**: 512MB RAM and 50% CPU prevent resource exhaustion
    - **Process limits**: 100 max processes prevent fork bombs
-   - **Writable filesystem**: Required for package installs and builds, but tmpfs has `noexec,nosuid`
+   - **Writable filesystem**: Required for package installs and builds, but `/tmp` uses `noexec,nosuid` to prevent execution of malicious files
 
    **Container Lifecycle:**
    - Creates new container for each request
    - Installs packages as root for system-level dependencies  
-   - Runs user code as 1000:1000 for isolation
+   - Runs user code as non-privileged user (1000:1000) to prevent system access
    - **Automatically destroys container after request completes (success or failure)**
    - Cleans up temporary directories and resources
 
