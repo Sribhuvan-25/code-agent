@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # Main Backspace Agent Application
+  backspace-agent:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      - SANDBOX_TIMEOUT=300
+      - MAX_CONCURRENT_JOBS=5
+    env_file:
+      - .env.prod
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      jaeger:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backspace-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Telemetry Service (Jaeger)
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Collector endpoint
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - backspace-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:16686"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Redis for session management and caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - backspace-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Nginx for load balancing (optional but good for learning)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backspace-agent
+    networks:
+      - backspace-network
+    restart: unless-stopped
+
+networks:
+  backspace-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  redis-data:
+    driver: local 
