@@ -21,7 +21,7 @@ from app.core.security import (
     SecurityError
 )
 from app.core.telemetry import get_telemetry
-from app.models.schemas import CodeRequest, CodeResponse, StreamEvent, StreamEventType
+from app.models.schemas import CodeRequest, StreamEvent, StreamEventType
 from app.services.streaming import get_streaming_service
 from app.services.sandbox import SandboxService
 from app.services import get_git_service, get_agent_service

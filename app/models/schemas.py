@@ -152,55 +152,6 @@ class StreamEvent(BaseModel):
     )
 
 
-class CodeResponse(BaseModel):
-    """Response schema for successful code completion."""
-    
-    success: bool = Field(
-        default=True,
-        description="Whether the operation was successful"
-    )
-    
-    pr_url: Optional[str] = Field(
-        default=None,
-        description="URL of the created pull request"
-    )
-    
-    branch_name: str = Field(
-        ...,
-        description="Name of the branch created"
-    )
-    
-    commit_hash: Optional[str] = Field(
-        default=None,
-        description="Hash of the commit created"
-    )
-    
-    files_changed: list[str] = Field(
-        default_factory=list,
-        description="List of files that were modified"
-    )
-    
-    summary: str = Field(
-        ...,
-        description="Summary of the changes made"
-    )
-    
-    correlation_id: str = Field(
-        ...,
-        description="Correlation ID for request tracing"
-    )
-    
-    duration: float = Field(
-        ...,
-        description="Total duration of the operation in seconds"
-    )
-    
-    metrics: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Performance and usage metrics"
-    )
-
-
 class ErrorResponse(BaseModel):
     """Response schema for errors."""
     
@@ -255,7 +206,7 @@ class HealthCheck(BaseModel):
     
     services: Dict[str, str] = Field(
         default_factory=dict,
-        description="Status of dependent services"
+        description="Status of individual services"
     )
 
 
@@ -291,66 +242,8 @@ class SandboxMetrics(BaseModel):
         ...,
         description="Container uptime in seconds"
     )
-
-
-class GitOperation(BaseModel):
-    """Schema for Git operations."""
     
-    operation: str = Field(
-        ...,
-        description="Git operation type"
-    )
-    
-    success: bool = Field(
-        ...,
-        description="Whether the operation was successful"
-    )
-    
-    output: Optional[str] = Field(
-        default=None,
-        description="Output from the git command"
-    )
-    
-    error: Optional[str] = Field(
-        default=None,
-        description="Error message if operation failed"
-    )
-    
-    duration: float = Field(
-        ...,
-        description="Duration of the operation in seconds"
-    )
-
-
-class AIProviderResponse(BaseModel):
-    """Response from AI provider."""
-    
-    provider: str = Field(
-        ...,
-        description="AI provider used"
-    )
-    
-    model: str = Field(
-        ...,
-        description="Model used"
-    )
-    
-    response: str = Field(
-        ...,
-        description="AI response"
-    )
-    
-    tokens_used: Optional[int] = Field(
-        default=None,
-        description="Number of tokens used"
-    )
-    
-    cost: Optional[float] = Field(
-        default=None,
-        description="Estimated cost"
-    )
-    
-    duration: float = Field(
-        ...,
-        description="Duration of the AI call in seconds"
+    process_count: int = Field(
+        default=0,
+        description="Number of processes in container"
     ) 
