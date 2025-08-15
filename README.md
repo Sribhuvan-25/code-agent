@@ -1,4 +1,4 @@
-   # Backspace AI Coding Agent
+   # AI Coding Agent
 
    An AI-powered coding assistant that analyzes repositories, implements features, and creates pull requests automatically. Just describe what you want, and it'll write the code and integrate it properly.
 
